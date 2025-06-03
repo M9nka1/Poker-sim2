@@ -2350,6 +2350,17 @@ app.get('/handhistory-manager.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'handhistory-manager.html'));
 });
 
+// Health check endpoint для Railway
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    uptime: process.uptime(),
+    activeSessions: activeSessions.size,
+    activeUsers: activeUsers.size,
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get('/api/status', (req, res) => {
   res.json({
     status: 'online',
@@ -2454,11 +2465,6 @@ app.get('/api/handhistory/view/:filename', (req, res) => {
     console.error('Ошибка чтения файла:', error);
     res.status(500).json({ error: 'Ошибка чтения файла' });
   }
-});
-
-// Health check для Railway
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
 // Обработка ошибок
