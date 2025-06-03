@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест подключения к серверу</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .connected {
+            background: #22c55e;
+            color: white;
+        }
+        .disconnected {
+            background: #ef4444;
+            color: white;
+        }
+        .waiting {
+            background: #f59e0b;
+            color: white;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .log {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 2px 0;
+        }
+        .log-info {
+            color: #60a5fa;
+        }
+        .log-success {
+            color: #34d399;
+        }
+        .log-error {
+            color: #f87171;
+        }
+        .log-warning {
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔌 Тест подключения к покерному серверу</h1>
+    
+    <div id="connection-status" class="status waiting">
+        ⏳ Подключение...
+    </div>
+    
+    <div class="controls">
+        <button onclick="testCreateSession()">🎮 Тест создания сессии</button>
+        <button onclick="clearLog()">🗑️ Очистить лог</button>
+        <button onclick="location.reload()">🔄 Перезагрузить</button>
+    </div>
+    
+    <div class="log" id="log">
+        <div class="log-entry log-info">Инициализация тестирования...</div>
+    </div>
+
+    <!-- Socket.IO Client -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script>
+        let socket;
+        let connected = false;
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        function updateStatus(isConnected, message) {
+            const statusDiv = document.getElementById('connection-status');
+            connected = isConnected;
+            
+            if (isConnected) {
+                statusDiv.className = 'status connected';
+                statusDiv.textContent = `✅ ${message}`;
+            } else {
+                statusDiv.className = 'status disconnected';
+                statusDiv.textContent = `❌ ${message}`;
+            }
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            log('Лог очищен');
+        }
+        
+        function testCreateSession() {
+            if (!connected) {
+                log('Нет подключения к серверу!', 'error');
+                return;
+            }
+            
+            log('Тестирование создания сессии...', 'info');
+            
+            const testSessionData = {
+                playerName: 'TestPlayer',
+                settings: {
+                    tablesCount: 1,
+                    rakePercent: 5,
+                    rakeDollar: 1,
+                    playerRanges: {
+                        player1: {
+                            currentWeight: 0,
+                            handWeights: {}
+                        },
+                        player2: {
+                            currentWeight: 0,
+                            handWeights: {}
+                        },
+                        positions: {
+                            player1: 'BTN',
+                            player2: 'BB'
+                        }
+                    },
+                    boardSettings: {
+                        flop: {
+                            specific: [],
+                            suits: 'any',
+                            pairing: 'any',
+                            ranks: {
+                                high: ['any'],
+                                middle: ['any'],
+                                low: ['any']
+                            }
+                        }
+                    }
+                }
+            };
+            
+            socket.emit('create-session', testSessionData);
+            log('Отправлен запрос на создание сессии', 'info');
+        }
+        
+        // Инициализация подключения
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Попытка подключения к серверу...');
+            
+            try {
+                socket = io();
+                
+                socket.on('connect', () => {
+                    log('Успешное подключение к серверу!', 'success');
+                    updateStatus(true, 'Подключено к серверу');
+                });
+                
+                socket.on('disconnect', () => {
+                    log('Отключение от сервера', 'error');
+                    updateStatus(false, 'Отключено от сервера');
+                });
+                
+                socket.on('session-created', (data) => {
+                    log(`Сессия создана! ID: ${data.sessionId}, UserID: ${data.userId}`, 'success');
+                });
+                
+                socket.on('error', (error) => {
+                    log(`Ошибка: ${JSON.stringify(error)}`, 'error');
+                });
+                
+                socket.on('connect_error', (error) => {
+                    log(`Ошибка подключения: ${error.message}`, 'error');
+                    updateStatus(false, 'Ошибка подключения');
+                });
+                
+                // Логирование всех событий
+                socket.onAny((eventName, data) => {
+                    log(`Событие: ${eventName} - ${JSON.stringify(data)}`, 'info');
+                });
+                
+            } catch (error) {
+                log(`Ошибка инициализации: ${error.message}`, 'error');
+                updateStatus(false, 'Ошибка инициализации');
+            }
+        });
+    </script>
+</body>
+</html> 

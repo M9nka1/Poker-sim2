@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отладка проблемы закрытия столов</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: white;
+        }
+        .debug-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .debug-section {
+            background: #2a2a2a;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .debug-title {
+            color: #4ade80;
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+        .test-instructions {
+            background: #3a3a3a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .test-step {
+            background: #333;
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #4ade80;
+            border-radius: 4px;
+        }
+        .warning {
+            background: #4a2a2a;
+            border-left-color: #f59e0b;
+            color: #fbbf24;
+        }
+        .console-log {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <div class="debug-section">
+            <div class="debug-title">🔧 Отладка проблемы закрытия столов</div>
+            
+            <div class="test-instructions">
+                <h3>📋 План тестирования:</h3>
+                
+                <div class="test-step">
+                    <strong>Шаг 1:</strong> Откройте основную страницу игры: <a href="/" target="_blank" style="color: #4ade80;">http://localhost:3000</a>
+                </div>
+                
+                <div class="test-step">
+                    <strong>Шаг 2:</strong> Создайте мультиплеерную сессию с 4 столами
+                </div>
+                
+                <div class="test-step">
+                    <strong>Шаг 3:</strong> Во втором окне/вкладке присоединитесь к сессии
+                </div>
+                
+                <div class="test-step">
+                    <strong>Шаг 4:</strong> Запустите игру - должны появиться 4 стола
+                </div>
+                
+                <div class="test-step warning">
+                    <strong>Шаг 5:</strong> Сыграйте раздачу до конца на ПЕРВОМ столе
+                </div>
+                
+                <div class="test-step warning">
+                    <strong>Шаг 6:</strong> Следите за консолью браузера - должно быть видно ЧЕТВЕРТЫЙ стол закрывается/исчезает
+                </div>
+                
+                <div class="test-step">
+                    <strong>Ожидаемый результат:</strong> С нашими исправлениями ЧЕТВЕРТЫЙ стол НЕ должен закрываться при завершении раздачи на первом столе
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <h3>🎯 Что исправлено:</h3>
+                <ul>
+                    <li>✅ Добавлена проверка участия игрока в <code>updateTableUI</code></li>
+                    <li>✅ Добавлена проверка участия игрока в <code>handleHandCompleted</code></li>
+                    <li>✅ Добавлена проверка участия игрока в <code>handleActionProcessed</code></li>
+                    <li>✅ Добавлена проверка участия игрока в <code>handleNewHandStarted</code></li>
+                    <li>✅ Добавлена проверка участия игрока в <code>handleTableUpdated</code></li>
+                    <li>✅ Улучшен метод <code>renderTableActions</code> - не возвращает пустую строку</li>
+                    <li>✅ Добавлено глобальное логирование всех событий Socket.IO</li>
+                </ul>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <h3>📊 Логи для отслеживания:</h3>
+                <p>Откройте консоль браузера (F12) и ищите сообщения:</p>
+                <div class="console-log">
+📡 СОБЫТИЕ: hand-completed { tableId: 1, ... }
+🎯 СОБЫТИЕ СТОЛА: hand-completed { tableId: 1, hasTableInfo: true, playersCount: 2, ... }
+⚠️ Игрок [userId] не участвует на столе 1, пропускаем обработку завершения раздачи
+🔄 Обновление интерфейса стола: 4
+⚠️ Игрок [userId] не участвует на столе 4, пропускаем обновление интерфейса
+                </div>
+            </div>
+        </div>
+        
+        <div class="debug-section">
+            <div class="debug-title">🚀 Быстрый запуск тестирования</div>
+            <div style="text-align: center; margin: 20px 0;">
+                <button onclick="window.open('/', '_blank')" style="background: #4ade80; color: #000; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; cursor: pointer; margin: 10px;">
+                    🎮 Открыть игру
+                </button>
+                <button onclick="window.open('/', '_blank')" style="background: #3b82f6; color: #fff; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; cursor: pointer; margin: 10px;">
+                    👥 Второй игрок
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

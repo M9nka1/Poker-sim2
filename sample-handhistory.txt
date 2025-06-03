@@ -1,0 +1,68 @@
+PokerStars Hand #ABC123-1-1: Hold'em No Limit ($0.50/$1.00 USD) - 2024/01/15 20:30:00 ET
+Table 'Simulator 1' 2-max Seat #1 is the button
+Seat 1: Player1 ($100.00 in chips)
+Seat 2: Player2 ($100.00 in chips)
+
+*** PREFLOP SPOT ***
+Позиция: BTN vs BB
+Стек: 100bb каждый
+Блайнды: 0.5/1.0
+
+ДЕЙСТВИЕ НА ПРЕФЛОПЕ:
+1. Игрок на BTN открывает рейз до 2.5bb
+2. BB делает 3-бет до 8bb
+3. BTN колирует
+
+Пот: 16.5bb
+Эффективный стек: 92bb
+
+*** FLOP *** [As Kh 7c]
+Player1: check
+Player2: bet $5.00
+Player1: call $5.00
+
+*** TURN *** [As Kh 7c] [2d]
+Player1: check
+Player2: bet $12.00
+Player1: fold
+
+*** SUMMARY ***
+Total pot $26.50 | Rake $1.33
+Seat 1: Player1 folded on the Turn
+Seat 2: Player2 collected ($25.17)
+
+---
+
+PokerStars Hand #ABC123-1-2: Hold'em No Limit ($0.50/$1.00 USD) - 2024/01/15 20:35:00 ET
+Table 'Simulator 1' 2-max Seat #2 is the button
+Seat 1: Player1 ($93.67 in chips)
+Seat 2: Player2 ($105.17 in chips)
+
+*** PREFLOP SPOT ***
+Позиция: BTN vs BB
+ДЕЙСТВИЕ НА ПРЕФЛОПЕ:
+1. BTN открывает рейз до 2.5bb
+2. BB колирует
+
+Пот: 5bb
+
+*** FLOP *** [Qd Js 9h]
+Player2: check
+Player1: bet $3.50
+Player2: raise $8.50
+Player1: call $5.00
+
+*** TURN *** [Qd Js 9h] [Tc]
+Player2: bet $15.00
+Player1: raise $35.00
+Player2: call $20.00
+
+*** RIVER *** [Qd Js 9h Tc] [5s]
+Player2: check
+Player1: bet $40.00
+Player2: call $40.00
+
+*** SUMMARY ***
+Total pot $148.00 | Rake $3.00
+Seat 1: Player1 showed [AhKc] and won ($145.00) with a straight (Ten to Ace)
+Seat 2: Player2 mucked [QsJh] 
