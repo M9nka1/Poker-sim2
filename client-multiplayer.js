@@ -11,6 +11,9 @@ class MultiplayerClient {
     this.tables = new Map(); // Кэш информации о столах
     this.lastTablesCount = 0; // Отслеживание изменений количества столов
     
+    // История действий для каждого стола
+    this.actionHistory = new Map(); // tableId -> ActionTracker
+    
     this.initializeSocket();
     this.showConnectionStatus();
   }
@@ -23,6 +26,18 @@ class MultiplayerClient {
     // Добавить глобальное логирование всех событий для отладки
     this.socket.onAny((eventName, data) => {
       console.log(`📡 СОБЫТИЕ: ${eventName}`, data);
+      
+      // Специальное логирование для table-updated
+      if (eventName === 'table-updated') {
+        console.log(`🎯 TABLE-UPDATED СОБЫТИЕ:`, {
+          tableId: data?.tableId,
+          currentPlayer: data?.currentPlayer,
+          currentBet: data?.currentBet,
+          playersCount: data?.players?.length,
+          playerIds: data?.players?.map(p => p.id),
+          currentUserId: this.userId
+        });
+      }
       
       // Специальное логирование для событий, связанных со столами
       if (eventName.includes('table') || eventName.includes('hand') || eventName.includes('action')) {
@@ -60,6 +75,7 @@ class MultiplayerClient {
     
     // Новые обработчики для обновлений столов и раздач
     this.socket.on('table-updated', (data) => this.handleTableUpdated(data));
+    this.socket.on('table-update', (data) => this.handleTableUpdate(data));
     this.socket.on('new-hand-started', (data) => this.handleNewHandStarted(data));
     this.socket.on('new-hand-auto-started', (data) => this.handleNewHandAutoStarted(data));
     this.socket.on('all-in-deal-started', (data) => this.handleAllInDealStarted(data));
@@ -202,6 +218,11 @@ class MultiplayerClient {
     });
   }
 
+  // Алиас для совместимости с кнопками
+  newHand(tableId) {
+    this.requestNewHand(tableId);
+  }
+
   // ===== ОБРАБОТЧИКИ СОБЫТИЙ =====
   handleSessionCreated(data) {
     this.userId = data.userId;
@@ -256,7 +277,7 @@ class MultiplayerClient {
   }
 
   handleActionProcessed(data) {
-    console.log('✅ Действие обработано:', data.action.action, data);
+    console.log('✅ Действие обработано:', data.action?.action, data);
     
     // 🔧 ИСПРАВЛЕНИЕ: Проверяем, участвует ли текущий игрок на этом столе
     if (data.tableInfo) {
@@ -265,6 +286,14 @@ class MultiplayerClient {
         console.log(`⚠️ Игрок ${this.userId} не участвует на столе ${data.tableId}, пропускаем обработку действия`);
         return;
       }
+    }
+    
+    // Записать действие в историю
+    if (data.action && data.tableId) {
+      console.log(`📝 Записываем действие: playerId=${data.action.playerId}, action=${data.action.action}, amount=${data.action.amount || 0}, tableId=${data.tableId}`);
+      this.recordAction(data.tableId, data.action.playerId, data.action.action, data.action.amount || 0);
+    } else {
+      console.log(`❌ Не удалось записать действие: action=${!!data.action}, tableId=${data.tableId}`);
     }
     
     // Обновить интерфейс стола после действия
@@ -309,6 +338,10 @@ class MultiplayerClient {
         return;
       }
     }
+    
+    // ОЧИЩАЕМ ЗАПИСИ ДЕЙСТВИЙ ПРИ ЗАВЕРШЕНИИ РАЗДАЧИ
+    console.log(`🧹 Очищаем записи действий для стола ${data.tableId} при завершении раздачи`);
+    this.resetActionTracker(data.tableId);
     
     // Обновить интерфейс стола
     if (data.tableInfo) {
@@ -398,11 +431,21 @@ class MultiplayerClient {
   }
 
   handleStreetChanged(data) {
-    // Обновить интерфейс стола для новой улицы
-    this.updateTableUI(data.tableId, data.tableInfo);
+    console.log('🛣️ Смена улицы:', data);
     
-    showNotification(`Новая улица: ${data.street}`, 'info');
-    console.log('Улица изменена:', data);
+    // Обновить улицу в истории действий
+    if (data.tableId && data.street) {
+      console.log(`🛣️ Устанавливаем улицу ${data.street} для стола ${data.tableId}`);
+      this.setStreet(data.tableId, data.street);
+    }
+    
+    // Обновить интерфейс стола для новой улицы
+    if (data.tableInfo) {
+      this.updateTableUI(data.tableId, data.tableInfo);
+    }
+    
+    this.showNotification(`Новая улица: ${this.getStreetName(data.street)}`, 'info');
+    console.log('✅ Улица изменена:', data);
   }
 
   handleHandHistoryExported(data) {
@@ -642,16 +685,24 @@ class MultiplayerClient {
               <!-- Ставка верхнего игрока -->
               <div class="opponent-bet-display">
                 <div class="bet-amount">$0.00</div>
+                <!-- Контейнер действий оппонента -->
+                <div class="opponent-actions-display">
+                  <div class="actions-text"></div>
+                </div>
               </div>
               
               <!-- Общие карты -->
               <div class="community-cards">
-                ${this.renderCommunityCards(tableInfo.communityCards)}
+                ${this.renderCommunityCards(tableInfo.communityCards || [])}
               </div>
               
               <!-- Ставка нижнего игрока -->
               <div class="hero-bet-display">
                 <div class="bet-amount">$0.00</div>
+                <!-- Контейнер действий героя -->
+                <div class="hero-actions-display">
+                  <div class="actions-text"></div>
+                </div>
               </div>
             </div>
             
@@ -695,6 +746,9 @@ class MultiplayerClient {
       </div>
     `;
     
+    // Инициализировать историю действий для стола
+    this.initializeActionTracker(tableInfo.tableId);
+    
     return table;
   }
 
@@ -733,13 +787,45 @@ class MultiplayerClient {
   }
 
   renderCommunityCards(cards) {
+    // Защита от undefined/null
+    if (!cards) cards = [];
+    
     let html = '';
     for (let i = 0; i < 5; i++) {
       if (i < cards.length) {
         const card = cards[i];
-        const suitClass = this.getSuitClass(card.suit);
-        html += `<div class="community-card ${suitClass}" data-suit="${card.suit}">
-                   <span class="card-rank">${card.rank}</span>
+        
+        // Обработка разных форматов карт
+        let rank, suit, suitClass;
+        
+        if (typeof card === 'string') {
+          // Если карта в строковом формате, например "As" или "Kh"
+          rank = card.charAt(0);
+          const suitChar = card.charAt(1);
+          suit = this.getSuitSymbol(suitChar);
+          suitClass = this.getSuitClass(suit);
+        } else if (card && typeof card === 'object') {
+          // Если карта в формате объекта
+          rank = card.rank || card.value || '?';
+          const cardSuit = card.suit || '?';
+          // Проверяем, является ли suit уже символом или буквой
+          if (cardSuit.length === 1 && ['♠', '♥', '♦', '♣'].includes(cardSuit)) {
+            // Уже символ масти
+            suit = cardSuit;
+          } else {
+            // Буквенное обозначение, конвертируем в символ
+            suit = this.getSuitSymbol(cardSuit);
+          }
+          suitClass = this.getSuitClass(suit);
+        } else {
+          // Если карта не определена
+          rank = '?';
+          suit = '?';
+          suitClass = 'spades';
+        }
+        
+        html += `<div class="community-card ${suitClass}" data-suit="${suit}">
+                   <span class="card-rank">${rank}</span>
                  </div>`;
       } else {
         html += `<div class="community-card empty">?</div>`;
@@ -766,14 +852,41 @@ class MultiplayerClient {
 
     // Для героя показываем открытые карты
     return cards.map(card => {
-      if (card.hidden) {
+      if (card && card.hidden) {
         // Рубашка карты
         return `<div class="player-card hidden"><i class="fas fa-square"></i></div>`;
       } else {
-        // Открытая карта
-        const suitClass = this.getSuitClass(card.suit);
-        return `<div class="player-card ${suitClass}" data-suit="${card.suit}">
-                  <span class="card-rank">${card.rank}</span>
+        // Открытая карта - обработка разных форматов
+        let rank, suit, suitClass;
+        
+        if (typeof card === 'string') {
+          // Если карта в строковом формате, например "As" или "Kh"
+          rank = card.charAt(0);
+          const suitChar = card.charAt(1);
+          suit = this.getSuitSymbol(suitChar);
+          suitClass = this.getSuitClass(suit);
+        } else if (card && typeof card === 'object') {
+          // Если карта в формате объекта
+          rank = card.rank || card.value || '?';
+          const cardSuit = card.suit || '?';
+          // Проверяем, является ли suit уже символом или буквой
+          if (cardSuit.length === 1 && ['♠', '♥', '♦', '♣'].includes(cardSuit)) {
+            // Уже символ масти
+            suit = cardSuit;
+          } else {
+            // Буквенное обозначение, конвертируем в символ
+            suit = this.getSuitSymbol(cardSuit);
+          }
+          suitClass = this.getSuitClass(suit);
+        } else {
+          // Если карта не определена
+          rank = '?';
+          suit = '?';
+          suitClass = 'spades';
+        }
+        
+        return `<div class="player-card ${suitClass}" data-suit="${suit}">
+                  <span class="card-rank">${rank}</span>
                 </div>`;
       }
     }).join('');
@@ -787,6 +900,16 @@ class MultiplayerClient {
       '♠': 'spades'
     };
     return suitMap[suit] || 'spades';
+  }
+
+  getSuitSymbol(suitChar) {
+    const suitSymbolMap = {
+      'h': '♥',
+      'd': '♦',
+      'c': '♣',
+      's': '♠'
+    };
+    return suitSymbolMap[suitChar.toLowerCase()] || '♠';
   }
 
   renderTableActions(tableInfo, tableId = null) {
@@ -825,13 +948,42 @@ class MultiplayerClient {
     const opponent = tableInfo.players.find(p => p.id !== this.userId);
     const opponentPosition = opponent ? opponent.position : null;
     
-    // Определить состояние торгов на текущей улице
-    const currentStreet = tableInfo.currentStreet || 'preflop';
-    const streetBets = tableInfo.streetBets || {};
-    const currentBets = streetBets[currentStreet] || {};
-    const heroCurrentBet = currentBets[this.userId] || 0;
-    const opponentCurrentBet = currentBets[opponent?.id] || 0;
-    const maxBet = Math.max(heroCurrentBet, opponentCurrentBet, 0);
+    // Определить состояние торгов - использовать данные от сервера
+    let heroCurrentBet = 0;
+    let opponentCurrentBet = 0;
+    let maxBet = 0;
+    
+    // Приоритет: данные от сервера (currentBet и players.bet)
+    if (tableInfo.currentBet !== undefined && tableInfo.players) {
+      // Найти ставки игроков из серверных данных
+      const heroPlayerData = tableInfo.players.find(p => p.id === this.userId);
+      const opponentPlayerData = tableInfo.players.find(p => p.id === opponent?.id);
+      
+      heroCurrentBet = heroPlayerData?.bet || 0;
+      opponentCurrentBet = opponentPlayerData?.bet || 0;
+      maxBet = Math.max(heroCurrentBet, opponentCurrentBet, tableInfo.currentBet || 0);
+      
+      console.log('💰 Использую серверные данные о ставках:', {
+        heroCurrentBet: `$${(heroCurrentBet / 100).toFixed(2)}`,
+        opponentCurrentBet: `$${(opponentCurrentBet / 100).toFixed(2)}`,
+        serverCurrentBet: `$${((tableInfo.currentBet || 0) / 100).toFixed(2)}`,
+        maxBet: `$${(maxBet / 100).toFixed(2)}`
+      });
+    } else {
+      // Fallback: локальные данные из streetBets
+      const currentStreet = tableInfo.currentStreet || 'preflop';
+      const streetBets = tableInfo.streetBets || {};
+      const currentBets = streetBets[currentStreet] || {};
+      heroCurrentBet = currentBets[this.userId] || 0;
+      opponentCurrentBet = currentBets[opponent?.id] || 0;
+      maxBet = Math.max(heroCurrentBet, opponentCurrentBet, 0);
+      
+      console.log('💰 Использую локальные данные о ставках (fallback):', {
+        heroCurrentBet: `$${(heroCurrentBet / 100).toFixed(2)}`,
+        opponentCurrentBet: `$${(opponentCurrentBet / 100).toFixed(2)}`,
+        maxBet: `$${(maxBet / 100).toFixed(2)}`
+      });
+    }
     
     // Рассчитать размер пота для кнопок сайзинга
     const handHistoryInfo = this.parseHandHistoryInfo(tableInfo);
@@ -840,16 +992,35 @@ class MultiplayerClient {
     // Рассчитать минимальный рейз
     const minimumRaise = this.calculateMinimumRaise(currentTableId);
     
+    // Определить максимальную возможную ставку (ограничено стеком)
+    const heroStack = (heroPlayer.stack || 0) / 100; // в долларах
+    const heroCurrentBetDollars = (heroPlayer.bet || 0) / 100; // в долларах
+    const maxPossibleBet = heroStack + heroCurrentBetDollars;
+    
     console.log(`🎯 Герой: ${heroPosition} vs Оппонент: ${opponentPosition}`);
     console.log(`💰 Ставки: Герой ${heroCurrentBet}, Оппонент ${opponentCurrentBet}, Макс: ${maxBet}`);
     console.log(`🏦 Размер пота: $${potAmount.toFixed(2)}`);
     console.log(`🔥 Минимальный рейз: $${minimumRaise.toFixed(2)}`);
+    console.log(`💰 Максимальная ставка: $${maxPossibleBet.toFixed(2)} (ограничено стеком)`);
+    
+    // Проверить активна ли раздача
+    if (!tableInfo.isHandActive) {
+      return `
+        <div class="table-actions">
+          <div style="text-align: center; margin-bottom: 10px;">
+            <button class="action-btn start-hand-btn" onclick="multiplayerClient.requestNewHand(${currentTableId})" style="background: #28a745; color: white;">
+              Начать раздачу
+            </button>
+          </div>
+        </div>
+      `;
+    }
     
     // Проверить очередь хода
     if (!this.isHeroTurn(tableInfo, heroPlayer)) {
       return `
         <div class="table-actions" style="opacity: 0.5; pointer-events: none;">
-          <div style="text-align: center; color: #666; font-size: 0.8rem;">Ожидание...</div>
+          <div style="text-align: center; color: #666; font-size: 0.8rem;">Ожидание хода...</div>
         </div>
       `;
     }
@@ -860,7 +1031,12 @@ class MultiplayerClient {
     const callAmount = maxBet - heroCurrentBet;
     
     // Определить значение для предзаполнения поля ввода
-    const inputDefaultValue = canCheck ? handHistoryInfo.bigBlind.toFixed(2) : minimumRaise.toFixed(2);
+    let inputDefaultValue;
+    if (canCheck) {
+      inputDefaultValue = Math.min(handHistoryInfo.bigBlind, maxPossibleBet).toFixed(2);
+    } else {
+      inputDefaultValue = Math.min(minimumRaise, maxPossibleBet).toFixed(2);
+    }
 
     let actionsHTML = `
       <div class="table-actions" data-table-id="${currentTableId}" onwheel="multiplayerClient.handleTableWheel(event, ${currentTableId})">
@@ -873,6 +1049,7 @@ class MultiplayerClient {
           <input type="text" class="sizing-input" id="sizing-input-${currentTableId}" placeholder="$" title="Размер ставки" 
                  value="${inputDefaultValue}"
                  onwheel="multiplayerClient.handleSizingWheel(event, ${currentTableId})"
+                 oninput="multiplayerClient.handleSizingInputChange(event, ${currentTableId})"
                  onkeydown="multiplayerClient.handleSizingKeydown(event, ${currentTableId})"
                  onclick="this.select()">
           <button class="sizing-settings-btn" onclick="multiplayerClient.showSizingSettings(${currentTableId})" title="Настройки сайзингов">⚙</button>
@@ -894,12 +1071,12 @@ class MultiplayerClient {
       actionsHTML += `<button class="action-btn call-btn" onclick="multiplayerClient.makeAction(${currentTableId}, 'call', ${callAmount})">CALL $${(callAmount / 100).toFixed(2)}</button>`;
     }
     
-    // BET или RAISE с отображением минимального размера
+    // BET или RAISE с отображением размера из поля ввода
     if (canCheck) {
       const minBet = handHistoryInfo.bigBlind;
-      actionsHTML += `<button class="action-btn bet-btn" onclick="multiplayerClient.makeBetFromInput(${currentTableId}, 'bet')">BET $${minBet.toFixed(2)}</button>`;
+      actionsHTML += `<button class="action-btn bet-btn" id="bet-btn-${currentTableId}" onclick="multiplayerClient.makeBetFromInput(${currentTableId}, 'bet')">BET $${inputDefaultValue}</button>`;
     } else {
-      actionsHTML += `<button class="action-btn raise-btn" onclick="multiplayerClient.makeBetFromInput(${currentTableId}, 'raise')">RAISE $${minimumRaise.toFixed(2)}</button>`;
+      actionsHTML += `<button class="action-btn raise-btn" id="raise-btn-${currentTableId}" onclick="multiplayerClient.makeBetFromInput(${currentTableId}, 'raise')">RAISE $${inputDefaultValue}</button>`;
     }
     
     actionsHTML += '</div></div>';
@@ -914,6 +1091,39 @@ class MultiplayerClient {
   }
 
   isHeroTurn(tableInfo, heroPlayer) {
+    // Использовать информацию от сервера если доступна
+    if (tableInfo.currentPlayer !== undefined) {
+      const isHeroToAct = tableInfo.currentPlayer === heroPlayer.id;
+      console.log('🎯 Использую данные сервера - герой должен ходить:', isHeroToAct, {
+        currentPlayer: tableInfo.currentPlayer,
+        heroId: heroPlayer.id,
+        isMatch: isHeroToAct
+      });
+      return isHeroToAct;
+    }
+    
+    // Fallback: проверяем activeToAct для совместимости
+    if (tableInfo.activeToAct !== undefined) {
+      const isHeroToAct = tableInfo.activeToAct === heroPlayer.id;
+      console.log('🎯 Использую данные сервера (activeToAct) - герой должен ходить:', isHeroToAct);
+      return isHeroToAct;
+    }
+    
+    // Fallback на клиентскую логику если сервер не предоставил информацию
+    console.log('🎯 Используем клиентскую логику определения очереди');
+    
+    // Проверить что раздача активна
+    if (!tableInfo.isHandActive) {
+      console.log('🎯 Раздача неактивна');
+      return false;
+    }
+    
+    // Проверить что игрок не сфолдил
+    if (heroPlayer.folded) {
+      console.log('🎯 Герой сфолдил');
+      return false;
+    }
+    
     // Простая логика для определения очереди хода в хедс-ап
     const currentStreet = tableInfo.currentStreet || 'preflop';
     const streetBets = tableInfo.streetBets || {};
@@ -922,7 +1132,8 @@ class MultiplayerClient {
     console.log('🎯 Проверка очереди хода:', {
       heroPosition: heroPlayer.position,
       currentStreet,
-      currentBets
+      currentBets,
+      heroActed: heroPlayer.acted
     });
     
     // Получить оппонента
@@ -931,14 +1142,15 @@ class MultiplayerClient {
     
     console.log('🎯 Оппонент:', {
       opponentPosition: opponent.position,
-      heroPosition: heroPlayer.position
+      heroPosition: heroPlayer.position,
+      opponentActed: opponent.acted
     });
     
     // Проверить кто уже действовал на этой улице
-    const heroActed = currentBets.hasOwnProperty(heroPlayer.id);
-    const opponentActed = currentBets.hasOwnProperty(opponent.id);
-    const heroBet = currentBets[heroPlayer.id] || 0;
-    const opponentBet = currentBets[opponent.id] || 0;
+    const heroActed = heroPlayer.acted || currentBets.hasOwnProperty(heroPlayer.id);
+    const opponentActed = opponent.acted || currentBets.hasOwnProperty(opponent.id);
+    const heroBet = heroPlayer.bet || currentBets[heroPlayer.id] || 0;
+    const opponentBet = opponent.bet || currentBets[opponent.id] || 0;
     
     console.log('🎯 Состояние действий:', {
       heroActed,
@@ -949,41 +1161,34 @@ class MultiplayerClient {
       opponentPosition: opponent.position
     });
     
-    // Определить кто должен ходить первым на основе позиций
-    const isHeroInPosition = this.isInPosition(heroPlayer.position, opponent.position);
+    // Если торги завершены (оба действовали и ставки равны), никто не ходит
+    if (heroActed && opponentActed && heroBet === opponentBet) {
+      console.log('🎯 Торги завершены: оба действовали с равными ставками');
+      return false;
+    }
     
-    console.log('🎯 Позиционность:', {
-      isHeroInPosition,
-      heroPosition: heroPlayer.position,
-      opponentPosition: opponent.position
-    });
+    // Если один из игроков еще не действовал
+    if (!heroActed && opponentActed) {
+      console.log('🎯 Герой еще не действовал, его очередь');
+      return true;
+    }
     
-    // Если никто еще не действовал, ходит OOP (вне позиции)
+    if (heroActed && !opponentActed) {
+      console.log('🎯 Оппонент еще не действовал, очередь оппонента');
+      return false;
+    }
+    
+    // Если никто не действовал, определяем по позиции
     if (!heroActed && !opponentActed) {
-      const shouldHeroActFirst = !isHeroInPosition;
+      // Определить кто должен ходить первым на основе позиций
+      const isHeroInPosition = this.isInPosition(heroPlayer.position, opponent.position);
+      const shouldHeroActFirst = !isHeroInPosition; // OOP ходит первым
       console.log('🎯 Никто не действовал, должен ходить OOP:', shouldHeroActFirst);
       return shouldHeroActFirst;
     }
     
-    // Если один игрок уже действовал, ходит другой
-    if (heroActed && !opponentActed) {
-      console.log('🎯 Герой уже действовал, ходит оппонент: false');
-      return false;
-    }
-    
-    if (opponentActed && !heroActed) {
-      console.log('🎯 Оппонент уже действовал, ходит герой: true');
-      return true;
-    }
-    
-    // Если оба действовали и ставки равны, раунд торгов завершен
-    if (heroActed && opponentActed && heroBet === opponentBet) {
-      console.log('🎯 Оба действовали с равными ставками, торги завершены: false');
-      return false;
-    }
-    
     // Если ставки разные, должен отвечать тот, у кого меньше ставка
-    if (heroActed && opponentActed && heroBet !== opponentBet) {
+    if (heroBet !== opponentBet) {
       const shouldHeroAct = heroBet < opponentBet;
       console.log('🎯 Разные ставки, должен отвечать тот у кого меньше:', shouldHeroAct);
       return shouldHeroAct;
@@ -1047,16 +1252,46 @@ class MultiplayerClient {
   // Методы для работы с кнопками сайзинга
   setSizingPercentage(tableId, percentage, potAmount) {
     // potAmount уже в долларах (приходит из calculatePotAmount)
-    const betAmount = potAmount * (percentage / 100);
+    let betAmount = potAmount * (percentage / 100);
+    
+    // Получить информацию о столе для ограничения по стеку
+    const tableInfo = this.tables.get(tableId);
+    if (tableInfo) {
+      const heroPlayer = tableInfo.players.find(p => p.id === this.userId);
+      if (heroPlayer) {
+        // Максимальная ставка ограничена оставшимся стеком игрока
+        const heroStack = (heroPlayer.stack || 0) / 100; // в долларах
+        const heroCurrentBet = (heroPlayer.currentBet || 0) / 100;
+        const maxPossibleBet = heroStack + heroCurrentBet; // весь доступный стек
+        
+        // Ограничить ставку размером стека
+        betAmount = Math.min(betAmount, maxPossibleBet);
+        
+        console.log(`💰 Сайзинг ${percentage}% от пота $${potAmount.toFixed(2)} = $${(potAmount * (percentage / 100)).toFixed(2)}, ограничен стеком до $${betAmount.toFixed(2)}`);
+      }
+    }
+    
     const betInDollars = betAmount.toFixed(2);
     
     const inputElement = document.getElementById(`sizing-input-${tableId}`);
     if (inputElement) {
       inputElement.value = betInDollars;
       inputElement.focus();
+      
+      // Обновить текст кнопки ставки
+      if (tableInfo) {
+        const heroPlayer = tableInfo.players.find(p => p.id === this.userId);
+        const opponent = tableInfo.players.find(p => p.id !== this.userId);
+        const heroCurrentBet = (heroPlayer?.bet || 0) / 100;
+        const opponentCurrentBet = (opponent?.bet || 0) / 100;
+        const maxBet = Math.max(heroCurrentBet, opponentCurrentBet, 0);
+        const canCheck = heroCurrentBet === maxBet;
+        
+        this.updateBetButtonText(tableId, parseFloat(betInDollars), canCheck);
+      }
     }
     
-    console.log(`💰 Установлен сайзинг ${percentage}% от пота $${potAmount.toFixed(2)}: $${betInDollars}`);
+    console.log(`💰 Установлен сайзинг ${percentage}% от пота: $${betInDollars}`);
   }
 
   handleSizingWheel(event, tableId) {
@@ -1088,8 +1323,8 @@ class MultiplayerClient {
     // Определить минимальное значение
     const heroPlayer = tableInfo.players.find(p => p.id === this.userId);
     const opponent = tableInfo.players.find(p => p.id !== this.userId);
-    const heroCurrentBet = (heroPlayer?.currentBet || 0) / 100;
-    const opponentCurrentBet = (opponent?.currentBet || 0) / 100;
+    const heroCurrentBet = (heroPlayer?.bet || 0) / 100;
+    const opponentCurrentBet = (opponent?.bet || 0) / 100;
     const maxBet = Math.max(heroCurrentBet, opponentCurrentBet, 0);
     const canCheck = heroCurrentBet === maxBet;
     
@@ -1102,15 +1337,54 @@ class MultiplayerClient {
       minimumValue = this.calculateMinimumRaise(tableId);
     }
     
-    // Применить ограничения
+    // Определить максимальное значение (ограничено стеком игрока)
+    const heroStack = (heroPlayer?.stack || 0) / 100; // в долларах
+    const maxPossibleBet = heroStack + heroCurrentBet; // весь доступный стек
+    
+    // Применить ограничения (минимум и максимум)
     newValue = Math.max(minimumValue, newValue);
+    newValue = Math.min(maxPossibleBet, newValue);
     
     // Округлить до центов
     newValue = Math.round(newValue * 100) / 100;
     
     inputElement.value = newValue.toFixed(2);
     
-    console.log(`🖱️ Изменение размера ставки колесиком в поле ввода: $${newValue.toFixed(2)} (шаг: $${step.toFixed(2)})`);
+    // Обновить текст кнопки ставки
+    this.updateBetButtonText(tableId, newValue, canCheck);
+    
+    console.log(`🖱️ Изменение размера ставки колесиком: $${newValue.toFixed(2)} (шаг: $${step.toFixed(2)}, макс: $${maxPossibleBet.toFixed(2)})`);
+  }
+
+  // Функция для обновления текста кнопки ставки
+  updateBetButtonText(tableId, amount, canCheck) {
+    const betBtnId = canCheck ? `bet-btn-${tableId}` : `raise-btn-${tableId}`;
+    const betBtn = document.getElementById(betBtnId);
+    
+    if (betBtn) {
+      const action = canCheck ? 'BET' : 'RAISE';
+      betBtn.textContent = `${action} $${amount.toFixed(2)}`;
+    }
+  }
+
+  // Обработчик изменения поля ввода ставки
+  handleSizingInputChange(event, tableId) {
+    const inputElement = event.target;
+    const newValue = parseFloat(inputElement.value) || 0;
+    
+    const tableInfo = this.tables.get(tableId);
+    if (!tableInfo) return;
+    
+    // Определить можно ли чекнуть
+    const heroPlayer = tableInfo.players.find(p => p.id === this.userId);
+    const opponent = tableInfo.players.find(p => p.id !== this.userId);
+    const heroCurrentBet = (heroPlayer?.bet || 0) / 100;
+    const opponentCurrentBet = (opponent?.bet || 0) / 100;
+    const maxBet = Math.max(heroCurrentBet, opponentCurrentBet, 0);
+    const canCheck = heroCurrentBet === maxBet;
+    
+    // Обновить текст кнопки
+    this.updateBetButtonText(tableId, newValue, canCheck);
   }
 
   handleSizingKeydown(event, tableId) {
@@ -1152,12 +1426,33 @@ class MultiplayerClient {
       }
     }
     
-    // Минимальная валидация
-    if (actionType === 'raise') {
-      const minimumRaise = this.calculateMinimumRaise(tableId);
-      if (amount < minimumRaise) {
-        this.showNotification(`Минимальный рейз: $${minimumRaise.toFixed(2)}`, 'error');
-        return;
+    // Валидация минимума и максимума
+    const tableInfo = this.tables.get(tableId);
+    if (tableInfo) {
+      const heroPlayer = tableInfo.players.find(p => p.id === this.userId);
+      if (heroPlayer) {
+        // Проверка максимума (ограничено стеком)
+        const heroStack = (heroPlayer.stack || 0) / 100; // в долларах
+        const heroCurrentBet = (heroPlayer.bet || 0) / 100;
+        const maxPossibleBet = heroStack + heroCurrentBet;
+        
+        if (amount > maxPossibleBet) {
+          this.showNotification(`Максимальная ставка: $${maxPossibleBet.toFixed(2)} (ограничено стеком)`, 'error');
+          return;
+        }
+        
+        // Проверка минимума для рейза
+        if (actionType === 'raise') {
+          const minimumRaise = this.calculateMinimumRaise(tableId);
+          
+          // Разрешить олл-ин даже если он меньше минимального рейза
+          const isAllIn = amount === maxPossibleBet;
+          
+          if (amount < minimumRaise && !isAllIn) {
+            this.showNotification(`Минимальный рейз: $${minimumRaise.toFixed(2)} (или олл-ин: $${maxPossibleBet.toFixed(2)})`, 'error');
+            return;
+          }
+        }
       }
     }
     
@@ -1212,10 +1507,24 @@ class MultiplayerClient {
   }
 
   updateTableUI(tableId, tableInfo) {
-    console.log('🔄 Обновление интерфейса стола:', tableId, tableInfo);
+    console.log('🔄 НАЧАЛО updateTableUI для стола:', tableId);
+    console.log('📊 Данные стола:', {
+      tableId,
+      currentPlayer: tableInfo?.currentPlayer,
+      currentBet: tableInfo?.currentBet,
+      playersCount: tableInfo?.players?.length,
+      players: tableInfo?.players?.map(p => ({ id: p.id, name: p.name, bet: p.bet, hasActed: p.hasActed })),
+      myUserId: this.userId
+    });
     
     // 🔧 ИСПРАВЛЕНИЕ: Проверяем, участвует ли текущий игрок на этом столе
     const heroPlayer = tableInfo.players.find(p => p.id === this.userId);
+    console.log('🎯 Поиск героя в updateTableUI:', {
+      myUserId: this.userId,
+      foundHero: !!heroPlayer,
+      heroData: heroPlayer
+    });
+    
     if (!heroPlayer) {
       console.log(`⚠️ Игрок ${this.userId} не участвует на столе ${tableId}, пропускаем обновление интерфейса`);
       return;
@@ -1288,22 +1597,33 @@ class MultiplayerClient {
     const heroBetDisplay = tableElement.querySelector('.hero-bet-display .bet-amount');
     
     if (opponentBetDisplay && opponentPlayer) {
-      const opponentBetAmount = (opponentPlayer.currentBet || 0) / 100;
+      const opponentBetAmount = (opponentPlayer.bet || 0) / 100;
       opponentBetDisplay.textContent = `$${opponentBetAmount.toFixed(2)}`;
     }
     
     if (heroBetDisplay && heroPlayer) {
-      const heroBetAmount = (heroPlayer.currentBet || 0) / 100;
+      const heroBetAmount = (heroPlayer.bet || 0) / 100;
       heroBetDisplay.textContent = `$${heroBetAmount.toFixed(2)}`;
     }
 
     // Обновить кнопки действий
     const actionsArea = tableElement.querySelector('.table-actions');
+    console.log('🎮 Поиск области действий:', {
+      tableId,
+      actionsAreaFound: !!actionsArea,
+      selector: '.table-actions'
+    });
+    
     if (actionsArea) {
       const newActions = this.renderTableActions(tableInfo, tableId);
       console.log('🎮 Новые кнопки действий для стола', tableId, ':', newActions);
       actionsArea.innerHTML = newActions;
+      console.log('✅ Кнопки действий обновлены для стола', tableId);
+    } else {
+      console.error('❌ Область действий не найдена для стола', tableId);
     }
+    
+    console.log('🏁 КОНЕЦ updateTableUI для стола:', tableId);
   }
 
   getTableGridClass(tablesCount) {
@@ -1447,31 +1767,236 @@ class MultiplayerClient {
   }
 
   // Обработчик обновления стола
+  // Обработчик обновления стола
   handleTableUpdated(data) {
-    const { tableId, tableInfo } = data;
-    console.log('🔄 Обновление стола:', tableId, tableInfo);
+    console.log('📡 Получено обновление стола:', data);
+    
+    // Обновить интерфейс стола
+    if (data.tableInfo) {
+      this.updateTableUI(data.tableId, data.tableInfo);
+    }
+    
+    // Показать сообщение если есть
+    if (data.message) {
+      this.showNotification(data.message, 'info');
+    }
+    
+    console.log(`✅ Стол ${data.tableId} обновлен: ${data.message || 'обновление состояния'}`);
+  }
+
+  handleTableUpdate(data) {
+    console.log('📥 ПОЛУЧЕНО table-updated событие:', data);
+    
+    // Проверяем, не является ли это событием завершения раздачи
+    if (data.message === 'Раздача завершена') {
+      console.log('🏁 Получено событие завершения раздачи, ожидаем новую раздачу...');
+      
+      // ОЧИЩАЕМ ЗАПИСИ ДЕЙСТВИЙ ПРИ ЗАВЕРШЕНИИ РАЗДАЧИ
+      this.resetActionTracker(data.tableId);
+      
+      // Показать сообщение о завершении раздачи
+      const tableElement = document.querySelector(`[data-table-id="${data.tableId}"]`);
+      if (tableElement) {
+        const actionsArea = tableElement.querySelector('.table-actions');
+        if (actionsArea) {
+          actionsArea.innerHTML = `
+            <div class="table-actions" style="opacity: 0.7; pointer-events: none;">
+              <div style="text-align: center; color: #4CAF50; font-size: 0.9rem; font-weight: bold;">
+                🏁 Раздача завершена
+              </div>
+            </div>
+          `;
+        }
+      }
+      return; // Не обрабатываем дальше
+    }
+    
+    // Проверяем, не является ли это событием смены улицы
+    if (data.street && data.tableId) {
+      console.log(`🛣️ Обнаружена смена улицы на ${data.street} для стола ${data.tableId}`);
+      this.setStreet(data.tableId, data.street);
+      // Обновляем отображение после смены улицы
+      this.updateActionDisplays(data.tableId);
+    }
+    
+    // Проверяем, в каком формате пришли данные
+    let tableInfo;
+    let tableId;
+    
+    if (data.tableInfo) {
+      // Старый формат: { tableId, tableInfo: {...} }
+      tableId = data.tableId;
+      tableInfo = data.tableInfo;
+      console.log('📦 Данные в старом формате (tableInfo)');
+    } else {
+      // Новый формат: { tableId, currentPlayer, currentBet, players }
+      tableId = data.tableId;
+      tableInfo = {
+        tableId: data.tableId,
+        currentPlayer: data.currentPlayer,
+        currentBet: data.currentBet,
+        players: data.players || [],
+        // Копируем все остальные поля
+        ...data
+      };
+      console.log('📦 Данные в новом формат (прямые поля)');
+    }
+    
+    // УПРОЩЕННАЯ ЛОГИКА: Добавляем разделители по количеству карт
+    if (tableInfo && tableInfo.communityCards) {
+      const cardCount = tableInfo.communityCards.length;
+      const currentTracker = this.actionHistory.get(tableId);
+      
+      if (currentTracker) {
+        // При 4 картах добавляем первый разделитель (флоп -> тёрн)
+        if (cardCount === 4 && !currentTracker.separatorAdded4) {
+          console.log(`🛣️ Добавляем разделитель при 4 картах (флоп -> тёрн)`);
+          this.addSeparatorToActions(tableId);
+          currentTracker.separatorAdded4 = true;
+        }
+        // При 5 картах добавляем второй разделитель (тёрн -> ривер)
+        else if (cardCount === 5 && !currentTracker.separatorAdded5) {
+          console.log(`🛣️ Добавляем разделитель при 5 картах (тёрн -> ривер)`);
+          this.addSeparatorToActions(tableId);
+          currentTracker.separatorAdded5 = true;
+        }
+        
+        this.updateActionDisplays(tableId);
+      }
+    }
+    
+    console.log('🔄 Обработка обновления стола:', {
+      tableId,
+      currentPlayer: tableInfo?.currentPlayer,
+      currentBet: tableInfo?.currentBet,
+      players: tableInfo?.players?.map(p => ({ id: p.id, name: p.name, bet: p.bet, hasActed: p.hasActed })),
+      myUserId: this.userId
+    });
     
     // 🔧 ИСПРАВЛЕНИЕ: Проверяем, участвует ли текущий игрок на этом столе
-    if (tableInfo) {
+    if (tableInfo.players && tableInfo.players.length > 0) {
       const heroPlayer = tableInfo.players.find(p => p.id === this.userId);
+      console.log('🎯 Поиск героя:', {
+        myUserId: this.userId,
+        foundHero: !!heroPlayer,
+        heroData: heroPlayer,
+        allPlayerIds: tableInfo.players.map(p => p.id)
+      });
+      
       if (!heroPlayer) {
         console.log(`⚠️ Игрок ${this.userId} не участвует на столе ${tableId}, пропускаем обновление стола`);
         return;
       }
     }
     
+    // Проверяем и записываем действия игроков
+    if (tableInfo.players) {
+      // Получаем предыдущее состояние стола для сравнения
+      const previousTableInfo = this.tables.get(tableId);
+      
+      tableInfo.players.forEach(player => {
+        // Получаем предыдущее состояние игрока
+        let previousPlayer = null;
+        let previousBet = 0;
+        let previousHasActed = false;
+        
+        if (previousTableInfo && previousTableInfo.players) {
+          previousPlayer = previousTableInfo.players.find(p => p.id === player.id);
+          if (previousPlayer) {
+            previousBet = previousPlayer.bet || 0;
+            previousHasActed = previousPlayer.hasActed || false;
+          }
+        }
+        
+        // Записываем действие только если игрок только что совершил его
+        if (player.hasActed && !previousHasActed) {
+          let action = 'check';
+          let amount = player.bet;
+          
+          // Проверяем, не фолд ли это
+          if (player.folded || (player.bet === 0 && tableInfo.currentBet > 0)) {
+            action = 'fold';
+            amount = 0;
+          } else if (player.bet === 0 && tableInfo.currentBet === 0) {
+            // Игрок поставил 0 при отсутствии ставок на столе - это CHECK
+            action = 'check';
+            amount = 0;
+          } else if (player.bet > 0) {
+            // УЛУЧШЕННАЯ ЛОГИКА: определяем действие по контексту
+            
+            // Получаем максимальную ставку среди других игроков (исключая текущего)
+            const otherPlayersBets = tableInfo.players
+              .filter(p => p.id !== player.id)
+              .map(p => p.bet || 0);
+            const maxOtherBet = Math.max(0, ...otherPlayersBets);
+            
+            console.log(`🎯 Анализ ставки игрока ${player.name}: его ставка=${player.bet}, макс. ставка других=${maxOtherBet}, текущая ставка стола=${tableInfo.currentBet}, предыдущая ставка=${previousBet}`);
+            
+            // Если игрок уравнял текущую ставку стола - это CALL
+            if (player.bet === tableInfo.currentBet && tableInfo.currentBet > 0) {
+              action = 'call';
+            }
+            // Если игрок поставил больше текущей ставки стола - это BET или RAISE
+            else if (player.bet > tableInfo.currentBet) {
+              if (tableInfo.currentBet === 0) {
+                // Нет ставки на столе - это BET
+                action = 'bet';
+              } else {
+                // Есть ставка на столе - это RAISE
+                action = 'raise';
+              }
+            }
+            // Если игрок поставил меньше текущей ставки стола - это может быть ALL-IN или ошибка
+            else if (player.bet < tableInfo.currentBet && player.bet > 0) {
+              // Предполагаем что это ALL-IN
+              action = 'call'; // или 'all-in' если хотим отдельно отслеживать
+            }
+            // Fallback - если логика не сработала
+            else {
+              if (tableInfo.currentBet === 0) {
+                action = 'bet';
+              } else {
+                action = 'call';
+              }
+            }
+          } else {
+            // Ставка 0 - проверяем контекст
+            if (tableInfo.currentBet === 0) {
+              action = 'check';
+            } else {
+              // Если есть ставка на столе, а игрок поставил 0 - это фолд
+              action = 'fold';
+            }
+          }
+          
+          console.log(`🎯 Записываем действие: игрок ${player.name}, действие: ${action}, сумма: ${amount}, текущая ставка стола: ${tableInfo.currentBet}, предыдущая ставка игрока: ${previousBet}`);
+          this.recordAction(tableId, player.id, action, amount);
+        }
+      });
+    }
+
     // Обновить кэш стола
     this.tables.set(tableId, tableInfo);
     
     // Найти элемент стола
     const tableElement = document.querySelector(`[data-table-id="${tableId}"]`);
+    console.log('🔍 Поиск элемента стола:', {
+      tableId,
+      elementFound: !!tableElement,
+      selector: `[data-table-id="${tableId}"]`
+    });
+    
     if (tableElement) {
       // 🔧 ИСПРАВЛЕНИЕ: Используем updateTableUI вместо полной замены элемента
+      console.log('🔄 Вызов updateTableUI для стола:', tableId);
       this.updateTableUI(tableId, tableInfo);
       
       console.log('✅ Стол обновлен через updateTableUI');
     } else {
       console.error('❌ Элемент стола не найден:', tableId);
+      // Попробуем найти все элементы столов для отладки
+      const allTables = document.querySelectorAll('[data-table-id]');
+      console.log('🔍 Все найденные столы:', Array.from(allTables).map(el => el.getAttribute('data-table-id')));
     }
   }
 
@@ -1486,6 +2011,10 @@ class MultiplayerClient {
         return;
       }
     }
+    
+    // Сбросить историю действий для новой раздачи
+    console.log(`🧹 Сбрасываем историю действий для новой раздачи на столе ${data.tableId}`);
+    this.resetActionTracker(data.tableId);
     
     // Обновить интерфейс стола
     if (data.tableInfo) {
@@ -1509,6 +2038,9 @@ class MultiplayerClient {
         return;
       }
     }
+    
+    // Сбросить историю действий для новой раздачи
+    this.resetActionTracker(data.tableId);
     
     // Обновить интерфейс стола
     if (data.tableInfo) {
@@ -1697,20 +2229,21 @@ class MultiplayerClient {
     }
     
     // Получить текущие ставки игроков
-    const heroBet = (heroPlayer.currentBet || 0) / 100; // в долларах
-    const opponentBet = (opponent.currentBet || 0) / 100; // в долларах
+    const heroBet = (heroPlayer.bet || 0) / 100; // в долларах
+    const opponentBet = (opponent.bet || 0) / 100; // в долларах
     const currentBet = Math.max(heroBet, opponentBet);
     
     // Получить информацию о блайндах
     const handHistoryInfo = this.parseHandHistoryInfo(tableInfo);
     const bigBlind = handHistoryInfo.bigBlind;
     
-    // Определить размер последнего увеличения ставки
+    // Определить размер последнего увеличения ставки согласно правилам покера
     let lastRaiseSize = bigBlind; // По умолчанию BB
     
     if (currentBet > 0) {
+      // Правило: минимальный рейз = размер предыдущей ставки/рейза
       // Если есть текущая ставка, минимальный рейз = удвоить эту ставку
-      // Правило: новая ставка должна быть минимум на размер предыдущей ставки больше
+      // Пример: бет $50 → минимальный рейз до $100 (увеличение на $50)
       lastRaiseSize = currentBet;
     }
     
@@ -1760,8 +2293,8 @@ class MultiplayerClient {
     // Определить минимальное значение
     const heroPlayer = tableInfo.players.find(p => p.id === this.userId);
     const opponent = tableInfo.players.find(p => p.id !== this.userId);
-    const heroCurrentBet = (heroPlayer?.currentBet || 0) / 100;
-    const opponentCurrentBet = (opponent?.currentBet || 0) / 100;
+    const heroCurrentBet = (heroPlayer?.bet || 0) / 100;
+    const opponentCurrentBet = (opponent?.bet || 0) / 100;
     const maxBet = Math.max(heroCurrentBet, opponentCurrentBet, 0);
     const canCheck = heroCurrentBet === maxBet;
     
@@ -1774,15 +2307,133 @@ class MultiplayerClient {
       minimumValue = this.calculateMinimumRaise(tableId);
     }
     
-    // Применить ограничения
+    // Определить максимальное значение (ограничено стеком игрока)
+    const heroStack = (heroPlayer?.stack || 0) / 100; // в долларах
+    const maxPossibleBet = heroStack + heroCurrentBet; // весь доступный стек
+    
+    // Применить ограничения (минимум и максимум)
     newValue = Math.max(minimumValue, newValue);
+    newValue = Math.min(maxPossibleBet, newValue);
     
     // Округлить до центов
     newValue = Math.round(newValue * 100) / 100;
     
     inputElement.value = newValue.toFixed(2);
     
-    console.log(`🖱️ Изменение размера ставки колесиком на столе ${tableId}: $${newValue.toFixed(2)} (шаг: $${step.toFixed(2)})`);
+    // Обновить текст кнопки ставки
+    this.updateBetButtonText(tableId, newValue, canCheck);
+    
+    console.log(`🖱️ Изменение размера ставки колесиком на столе ${tableId}: $${newValue.toFixed(2)} (шаг: $${step.toFixed(2)}, макс: $${maxPossibleBet.toFixed(2)})`);
+  }
+
+  // ===== МЕТОДЫ ДЛЯ РАБОТЫ С ИСТОРИЕЙ ДЕЙСТВИЙ =====
+  initializeActionTracker(tableId) {
+    if (!this.actionHistory.has(tableId)) {
+      this.actionHistory.set(tableId, new ActionTracker());
+    }
+  }
+
+  resetActionTracker(tableId) {
+    console.log(`🔄 Сброс трекера действий для стола ${tableId}`);
+    
+    if (this.actionHistory.has(tableId)) {
+      this.actionHistory.get(tableId).reset();
+    } else {
+      this.initializeActionTracker(tableId);
+    }
+    
+    // Сбрасываем флаги разделителей
+    const tracker = this.actionHistory.get(tableId);
+    if (tracker) {
+      tracker.separatorAdded4 = false;
+      tracker.separatorAdded5 = false;
+    }
+    
+    // Принудительно очищаем отображение действий
+    const tableElement = document.querySelector(`[data-table-id="${tableId}"]`);
+    if (tableElement) {
+      const heroActionsElement = tableElement.querySelector('.hero-actions-display .actions-text');
+      const opponentActionsElement = tableElement.querySelector('.opponent-actions-display .actions-text');
+      
+      if (heroActionsElement) {
+        heroActionsElement.textContent = '';
+        console.log(`🧹 Очищены действия героя для стола ${tableId}`);
+      }
+      
+      if (opponentActionsElement) {
+        opponentActionsElement.textContent = '';
+        console.log(`🧹 Очищены действия оппонента для стола ${tableId}`);
+      }
+    }
+    
+    this.updateActionDisplays(tableId);
+  }
+
+  addSeparatorToActions(tableId) {
+    console.log(`➕ Добавление разделителя для стола ${tableId}`);
+    const tracker = this.actionHistory.get(tableId);
+    if (tracker) {
+      tracker.addSeparator();
+    }
+  }
+
+  recordAction(tableId, playerId, action, amount) {
+    this.initializeActionTracker(tableId);
+    const tracker = this.actionHistory.get(tableId);
+    
+    // Определяем, является ли это действие героя
+    const isHero = playerId === this.userId;
+    
+    tracker.addAction(playerId, action, amount, isHero);
+    this.updateActionDisplays(tableId);
+    
+    console.log(`📝 Записано действие: ${action} ${amount} для игрока ${playerId} (герой: ${isHero})`);
+  }
+
+  setStreet(tableId, street) {
+    this.initializeActionTracker(tableId);
+    const tracker = this.actionHistory.get(tableId);
+    tracker.setStreet(street);
+    
+    console.log(`🛣️ Улица изменена на ${street} для стола ${tableId}`);
+  }
+
+  updateActionDisplays(tableId) {
+    console.log(`🎯 Обновление отображения действий для стола ${tableId}`);
+    
+    const tableElement = document.querySelector(`[data-table-id="${tableId}"]`);
+    if (!tableElement) {
+      console.log(`❌ Элемент стола ${tableId} не найден`);
+      return;
+    }
+
+    const tracker = this.actionHistory.get(tableId);
+    if (!tracker) {
+      console.log(`❌ Трекер действий для стола ${tableId} не найден`);
+      return;
+    }
+
+    // Обновляем отображение действий героя
+    const heroActionsElement = tableElement.querySelector('.hero-actions-display .actions-text');
+    console.log(`🎯 Поиск героя actions element:`, !!heroActionsElement);
+    if (heroActionsElement) {
+      const heroActionsString = tracker.getActionsString(true);
+      console.log(`🎯 Строка действий героя: "${heroActionsString}"`);
+      heroActionsElement.textContent = heroActionsString || '';
+    } else {
+      console.log(`❌ Элемент .hero-actions-display .actions-text не найден для стола ${tableId}`);
+    }
+
+    // Обновляем отображение действий оппонента
+    const opponentActionsElement = tableElement.querySelector('.opponent-actions-display .actions-text');
+    console.log(`🎯 Поиск оппонента actions element:`, !!opponentActionsElement);
+    if (opponentActionsElement) {
+      const opponentActionsString = tracker.getActionsString(false);
+      console.log(`🎯 Строка действий оппонента: "${opponentActionsString}"`);
+      opponentActionsElement.textContent = opponentActionsString || '';
+    } else {
+      console.log(`❌ Элемент .opponent-actions-display .actions-text не найден для стола ${tableId}`);
+    }
   }
 }
 
@@ -2420,4 +3071,138 @@ function getElementId(element) {
   if (element.classList.contains('opponent-bet-display')) return 'opponent-bet-display';
   if (element.classList.contains('hero-bet-display')) return 'hero-bet-display';
   return 'unknown';
+}
+
+// ===== КЛАСС ДЛЯ ОТСЛЕЖИВАНИЯ ДЕЙСТВИЙ ИГРОКОВ =====
+class ActionTracker {
+  constructor() {
+    this.reset();
+  }
+
+  reset() {
+    this.heroActions = {
+      flop: [],
+      turn: [],
+      river: []
+    };
+    this.opponentActions = {
+      flop: [],
+      turn: [],
+      river: []
+    };
+    this.currentStreet = 'flop';
+    // Отслеживаем последние записанные действия для каждого игрока
+    this.lastRecordedActions = new Map();
+  }
+
+  setStreet(street) {
+    const oldStreet = this.currentStreet;
+    this.currentStreet = street;
+    console.log(`🛣️ ActionTracker: улица изменена с ${oldStreet} на ${street}`);
+    
+    // Очищаем кэш записанных действий при смене улицы
+    this.lastRecordedActions.clear();
+  }
+
+  addSeparator() {
+    console.log(`➕ ActionTracker: добавление разделителя "|"`);
+    // Добавляем разделитель к текущим действиям обоих игроков
+    // Но только если у них есть действия на текущей улице
+    if (this.heroActions[this.currentStreet] && this.heroActions[this.currentStreet].length > 0) {
+      this.heroActions[this.currentStreet].push('|');
+    }
+    if (this.opponentActions[this.currentStreet] && this.opponentActions[this.currentStreet].length > 0) {
+      this.opponentActions[this.currentStreet].push('|');
+    }
+  }
+
+  addAction(playerId, action, amount, isHero) {
+    const actionCode = this.getActionCode(action, amount);
+    const playerActions = isHero ? this.heroActions : this.opponentActions;
+    
+    console.log(`🎯 Попытка добавить действие:`, {
+      playerId,
+      action,
+      amount,
+      actionCode,
+      isHero,
+      currentStreet: this.currentStreet
+    });
+    
+    // Создаем уникальный ключ для действия
+    const actionKey = `${playerId}_${this.currentStreet}_${action}_${amount}`;
+    
+    // Проверяем, не записывали ли мы уже это действие
+    if (this.lastRecordedActions.has(actionKey)) {
+      console.log(`⚠️ Пропускаем уже записанное действие: ${actionCode} для игрока ${playerId}`);
+      return;
+    }
+    
+    if (playerActions[this.currentStreet]) {
+      playerActions[this.currentStreet].push(actionCode);
+      this.lastRecordedActions.set(actionKey, true);
+      console.log(`✅ Добавлено действие: ${actionCode} для ${isHero ? 'героя' : 'оппонента'} (${playerId}) на улице ${this.currentStreet}`);
+      console.log(`📊 Текущие действия на ${this.currentStreet}:`, playerActions[this.currentStreet]);
+    } else {
+      console.error(`❌ Неизвестная улица: ${this.currentStreet}`);
+    }
+  }
+
+  getActionCode(action, amount) {
+    switch (action) {
+      case 'check':
+        return 'X';
+      case 'call':
+        return 'C';
+      case 'bet':
+        return `B${this.formatAmount(amount)}`;
+      case 'raise':
+        return `R${this.formatAmount(amount)}`;
+      case 'fold':
+        return 'F';
+      case 'all-in':
+        return `AI${this.formatAmount(amount)}`;
+      default:
+        return action.charAt(0).toUpperCase();
+    }
+  }
+
+  formatAmount(amount) {
+    // Конвертируем центы в доллары
+    const dollars = amount / 100;
+    
+    // Убираем нули для круглых сумм
+    if (dollars >= 1000) {
+      return `${(dollars / 1000).toFixed(1).replace('.0', '')}k`;
+    } else if (dollars % 1 === 0) {
+      return dollars.toString();
+    } else {
+      return dollars.toFixed(2).replace(/\.?0+$/, '');
+    }
+  }
+
+  getActionsString(isHero) {
+    const playerActions = isHero ? this.heroActions : this.opponentActions;
+    const streets = [];
+
+    console.log(`🎯 Формирование строки действий для ${isHero ? 'героя' : 'оппонента'}:`, {
+      flop: playerActions.flop,
+      turn: playerActions.turn,
+      river: playerActions.river
+    });
+
+    if (playerActions.flop.length > 0) {
+      streets.push(playerActions.flop.join(''));
+    }
+    if (playerActions.turn.length > 0) {
+      streets.push(playerActions.turn.join(''));
+    }
+    if (playerActions.river.length > 0) {
+      streets.push(playerActions.river.join(''));
+    }
+
+    const result = streets.join('|');
+    console.log(`🎯 Итоговая строка действий: "${result}"`);
+    return result;
+  }
 } 

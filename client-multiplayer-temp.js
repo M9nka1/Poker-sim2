@@ -599,6 +599,10 @@ class MultiplayerClient {
               <!-- Ставка верхнего игрока -->
               <div class="opponent-bet-display">
                 <div class="bet-amount">$0.00</div>
+                <!-- Контейнер действий оппонента -->
+                <div class="opponent-actions-display">
+                  <div class="actions-text"></div>
+                </div>
               </div>
               
               <!-- Общие карты -->
@@ -609,6 +613,10 @@ class MultiplayerClient {
               <!-- Ставка нижнего игрока -->
               <div class="hero-bet-display">
                 <div class="bet-amount">$0.00</div>
+                <!-- Контейнер действий героя -->
+                <div class="hero-actions-display">
+                  <div class="actions-text"></div>
+                </div>
               </div>
             </div>
             
@@ -1131,12 +1139,12 @@ class MultiplayerClient {
     const heroBetDisplay = tableElement.querySelector('.hero-bet-display .bet-amount');
     
     if (opponentBetDisplay && opponentPlayer) {
-      const opponentBetAmount = (opponentPlayer.currentBet || 0) / 100;
+      const opponentBetAmount = (opponentPlayer.bet || 0) / 100;
       opponentBetDisplay.textContent = `$${opponentBetAmount.toFixed(2)}`;
     }
     
     if (heroBetDisplay && heroPlayer) {
-      const heroBetAmount = (heroPlayer.currentBet || 0) / 100;
+      const heroBetAmount = (heroPlayer.bet || 0) / 100;
       heroBetDisplay.textContent = `$${heroBetAmount.toFixed(2)}`;
     }
 

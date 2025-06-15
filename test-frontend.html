@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тестирование API Аутентификации</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #4a5568;
+        }
+        
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+        
+        .section h3 {
+            color: #2d3748;
+            margin-top: 0;
+        }
+        
+        input, button {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        button {
+            background: #4299e1;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #3182ce;
+        }
+        
+        button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+        }
+        
+        .output {
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .success {
+            color: #38a169;
+            font-weight: bold;
+        }
+        
+        .error {
+            color: #e53e3e;
+            font-weight: bold;
+        }
+        
+        .user-info {
+            background: #e6fffa;
+            border: 1px solid #81e6d9;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Тестирование API Аутентификации</h1>
+            <p>Poker Simulator 2.0 - Authentication System Test</p>
+        </div>
+
+        <!-- Регистрация -->
+        <div class="section">
+            <h3>📝 Регистрация</h3>
+            <input type="email" id="registerEmail" placeholder="Email" value="test@example.com">
+            <input type="password" id="registerPassword" placeholder="Пароль" value="Password123!">
+            <button onclick="register()">Зарегистрироваться</button>
+            <div id="registerOutput" class="output"></div>
+        </div>
+
+        <!-- Вход -->
+        <div class="section">
+            <h3>🔑 Вход</h3>
+            <input type="email" id="loginEmail" placeholder="Email" value="test@example.com">
+            <input type="password" id="loginPassword" placeholder="Пароль" value="Password123!">
+            <button onclick="login()">Войти</button>
+            <div id="loginOutput" class="output"></div>
+        </div>
+
+        <!-- Информация о пользователе -->
+        <div id="userSection" class="section hidden">
+            <h3>👤 Информация о пользователе</h3>
+            <div id="userInfo" class="user-info"></div>
+            <button onclick="getUserInfo()">Обновить информацию</button>
+            <button onclick="logout()">Выйти</button>
+            <div id="userOutput" class="output"></div>
+        </div>
+
+        <!-- История раздач -->
+        <div id="handsSection" class="section hidden">
+            <h3>🎴 История раздач</h3>
+            <button onclick="getHands()">Получить историю</button>
+            <button onclick="playHand()">Сыграть тестовую раздачу</button>
+            <div id="handsOutput" class="output"></div>
+        </div>
+
+        <!-- Административная панель -->
+        <div id="adminSection" class="section hidden">
+            <h3>👑 Администрирование</h3>
+            <button onclick="getUsers()">Получить всех пользователей</button>
+            <input type="text" id="limitUserId" placeholder="User ID для изменения лимита">
+            <input type="number" id="newLimit" placeholder="Новый лимит раздач" value="100">
+            <button onclick="setUserLimit()">Установить лимит</button>
+            <div id="adminOutput" class="output"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001/api';
+        let accessToken = null;
+        let currentUser = null;
+
+        // Утилита для HTTP запросов
+        async function apiRequest(endpoint, options = {}) {
+            const url = `${API_BASE}${endpoint}`;
+            const config = {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                },
+                credentials: 'include', // Важно для cookies
+                ...options
+            };
+
+            if (accessToken) {
+                config.headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+
+            try {
+                const response = await fetch(url, config);
+                const data = await response.json();
+                return {
+                    ok: response.ok,
+                    status: response.status,
+                    data: data
+                };
+            } catch (error) {
+                return {
+                    ok: false,
+                    status: 0,
+                    data: { message: `Ошибка сети: ${error.message}` }
+                };
+            }
+        }
+
+        // Регистрация
+        async function register() {
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const output = document.getElementById('registerOutput');
+
+            const result = await apiRequest('/auth/register', {
+                method: 'POST',
+                body: JSON.stringify({ email, password })
+            });
+
+            output.innerHTML = `Статус: ${result.status}\n${JSON.stringify(result.data, null, 2)}`;
+            output.className = `output ${result.ok ? 'success' : 'error'}`;
+        }
+
+        // Вход
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const output = document.getElementById('loginOutput');
+
+            const result = await apiRequest('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ email, password })
+            });
+
+            output.innerHTML = `Статус: ${result.status}\n${JSON.stringify(result.data, null, 2)}`;
+            output.className = `output ${result.ok ? 'success' : 'error'}`;
+
+            if (result.ok && result.data.data) {
+                accessToken = result.data.data.accessToken;
+                currentUser = result.data.data.user;
+                updateUI();
+            }
+        }
+
+        // Получение информации о пользователе
+        async function getUserInfo() {
+            const output = document.getElementById('userOutput');
+            
+            const result = await apiRequest('/me');
+            
+            output.innerHTML = `Статус: ${result.status}\n${JSON.stringify(result.data, null, 2)}`;
+            output.className = `output ${result.ok ? 'success' : 'error'}`;
+
+            if (result.ok && result.data.data) {
+                currentUser = result.data.data.user;
+                updateUserInfo();
+            }
+        }
+
+        // Получение истории раздач
+        async function getHands() {
+            const output = document.getElementById('handsOutput');
+            
+            const result = await apiRequest('/me/hands');
+            
+            output.innerHTML = `Статус: ${result.status}\n${JSON.stringify(result.data, null, 2)}`;
+            output.className = `output ${result.ok ? 'success' : 'error'}`;
+        }
+
+        // Сыграть тестовую раздачу
+        async function playHand() {
+            const output = document.getElementById('handsOutput');
+            
+            const testHand = {
+                board: ['As', 'Kh', '7d'],
+                action: 'check',
+                pot: 100,
+                timestamp: new Date().toISOString()
+            };
+
+            const result = await apiRequest('/game/play', {
+                method: 'POST',
+                body: JSON.stringify({ hand_data: testHand })
+            });
+            
+            output.innerHTML = `Статус: ${result.status}\n${JSON.stringify(result.data, null, 2)}`;
+            output.className = `output ${result.ok ? 'success' : 'error'}`;
+
+            if (result.ok) {
+                getUserInfo(); // Обновляем информацию о пользователе
+            }
+        }
+
+        // Выход
+        async function logout() {
+            const output = document.getElementById('userOutput');
+            
+            const result = await apiRequest('/auth/logout', {
+                method: 'POST'
+            });
+            
+            output.innerHTML = `Статус: ${result.status}\n${JSON.stringify(result.data, null, 2)}`;
+            output.className = `output ${result.ok ? 'success' : 'error'}`;
+
+            if (result.ok) {
+                accessToken = null;
+                currentUser = null;
+                updateUI();
+            }
+        }
+
+        // Административные функции
+        async function getUsers() {
+            const output = document.getElementById('adminOutput');
+            
+            const result = await apiRequest('/admin/users');
+            
+            output.innerHTML = `Статус: ${result.status}\n${JSON.stringify(result.data, null, 2)}`;
+            output.className = `output ${result.ok ? 'success' : 'error'}`;
+        }
+
+        async function setUserLimit() {
+            const userId = document.getElementById('limitUserId').value;
+            const limit = parseInt(document.getElementById('newLimit').value);
+            const output = document.getElementById('adminOutput');
+
+            if (!userId || isNaN(limit)) {
+                output.innerHTML = 'Ошибка: Укажите User ID и корректный лимит';
+                output.className = 'output error';
+                return;
+            }
+
+            const result = await apiRequest(`/admin/users/${userId}/limit`, {
+                method: 'POST',
+                body: JSON.stringify({ limit })
+            });
+            
+            output.innerHTML = `Статус: ${result.status}\n${JSON.stringify(result.data, null, 2)}`;
+            output.className = `output ${result.ok ? 'success' : 'error'}`;
+        }
+
+        // Обновление интерфейса
+        function updateUI() {
+            const userSection = document.getElementById('userSection');
+            const handsSection = document.getElementById('handsSection');
+            const adminSection = document.getElementById('adminSection');
+
+            if (currentUser) {
+                userSection.classList.remove('hidden');
+                handsSection.classList.remove('hidden');
+                updateUserInfo();
+
+                // Показываем админскую панель если есть права
+                if (currentUser.roles && currentUser.roles.includes('admin')) {
+                    adminSection.classList.remove('hidden');
+                }
+            } else {
+                userSection.classList.add('hidden');
+                handsSection.classList.add('hidden');
+                adminSection.classList.add('hidden');
+            }
+        }
+
+        function updateUserInfo() {
+            if (!currentUser) return;
+
+            const userInfo = document.getElementById('userInfo');
+            userInfo.innerHTML = `
+                <strong>ID:</strong> ${currentUser.user_id}<br>
+                <strong>Email:</strong> ${currentUser.email}<br>
+                <strong>Лимит раздач:</strong> ${currentUser.hand_limit}<br>
+                <strong>Роли:</strong> ${currentUser.roles.join(', ') || 'Нет ролей'}<br>
+                <strong>Дата создания:</strong> ${currentUser.created_at}
+            `;
+        }
+
+        // Инициализация
+        window.onload = function() {
+            console.log('🔐 Тестовая страница API аутентификации загружена');
+            console.log('📡 API Base URL:', API_BASE);
+        };
+    </script>
+</body>
+</html> 

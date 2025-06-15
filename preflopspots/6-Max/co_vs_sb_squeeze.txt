@@ -1,0 +1,15 @@
+PokerStars Hand #4400520541168030868: Hold'em No Limit ($0.25/$0.50 USD) - 2024/06/05 09:47:00 ET
+Table 'CO vs SB Squeeze' 6-max Seat #1 is the button
+Seat 1: Button ($50.00 in chips)
+Seat 2: SB_Player ($50.00 in chips)
+Seat 3: BB_Player ($50.00 in chips)
+Seat 5: CO_Player ($50.00 in chips)
+SB_Player: posts small blind $0.25
+BB_Player: posts big blind $0.50
+*** HOLE CARDS ***
+CO_Player: raises $1.00 to $1.50
+Button: calls $1.50
+SB_Player: raises $6.00 to $7.50
+BB_Player: folds
+CO_Player: calls $6.00
+Button: folds 

@@ -342,7 +342,7 @@ class PokerTable {
     this.pot = 0;
     this.currentBet = 0;
     this.handNumber = 0;
-    this.street = 'preflop'; // preflop, flop, turn, river
+    this.street = 'waiting'; // waiting, flop, turn, river (симулятор начинает с флопа)
     this.actions = [];
     this.preflopSpot = settings.preflopSpot;
     
@@ -389,10 +389,11 @@ class PokerTable {
 
   startNewHand() {
     this.handNumber++;
-    this.street = 'flop';
+    this.street = 'flop';  // 🔧 ВОЗВРАТ К ИСХОДНОЙ ЛОГИКЕ: Начинаем с флопа!
     this.actions = [];
     this.communityCards = [];
     this.deck = createDeck(); // Создать новую колоду
+    shuffleDeck(this.deck); // Перемешать колоду
     
     console.log(`🎮 Начинаем новую раздачу #${this.handNumber} на столе ${this.tableId}`);
     console.log(`🔍 preflopSpot существует: ${!!this.preflopSpot}`);
@@ -448,8 +449,7 @@ class PokerTable {
     this.dealPlayerCards();
     this.dealFlop();
     
-    // Инициализировать торги на флопе
-    this.initializeFlopBetting();
+    console.log('✅ Флоп роздан, готов к торгам');
     
     console.log(`🎮 Раздача #${this.handNumber} завершена на столе ${this.tableId}`);
     console.log(`📊 Итоговое состояние: улица=${this.street}, банк=$${(this.pot / 100).toFixed(2)}, текущая ставка=$${(this.currentBet / 100).toFixed(2)}`);
@@ -528,6 +528,8 @@ class PokerTable {
 
   dealFlop() {
     console.log('🎴 Начинаю раздачу флопа...');
+    this.street = 'flop'; // Установить улицу
+    
     console.log('🎴 Настройки флопа:', JSON.stringify(this.settings.boardSettings.flop, null, 2));
     
     // Если указаны конкретные карты флопа
@@ -548,6 +550,8 @@ class PokerTable {
       this.communityCards = this.generateRestrictedFlop();
       console.log('🎴 Сгенерированный флоп:', this.communityCards);
     }
+    
+    console.log('✅ Флоп роздан, готов к торгам');
   }
 
   generateRestrictedFlop() {
@@ -711,6 +715,62 @@ class PokerTable {
       console.log('❌ preflopSpot пустой или не определен');
       return defaultInfo;
     }
+
+    // Извлечение информации о позициях игроков и их статусе на постфлопе
+    this.playerPositions = [];
+    const positionMap = {
+      'SB': 'OOP',
+      'BB': 'OOP',
+      'EP': 'OOP',
+      'MP': 'OOP',
+      'CO': 'IP',
+      'BU': 'IP',
+      'BTN': 'IP',
+      'c3bBU': 'IP'  // Добавляем специальный случай для c3bBU (call 3bet Button)
+    };
+
+    // Парсинг строк с информацией о местах игроков
+    const seatLines = this.preflopSpot.split('\r\n').filter(line => line.startsWith('Seat '));
+    seatLines.forEach(line => {
+      const seatMatch = line.match(/Seat \d+: ([^\s]+) \(\$[0-9.]+ in chips\)/);
+      if (seatMatch) {
+        let playerName = seatMatch[1];
+        let position = 'Unknown';
+        let postflopStatus = 'Unknown';
+
+        // Определение позиции из имени игрока (если она закодирована в имени)
+        if (playerName.includes('_')) {
+          const parts = playerName.split('_');
+          for (const part of parts) {
+            const upperPart = part.toUpperCase();
+            if (['SB', 'BB', 'EP', 'MP', 'CO', 'BU', 'BTN'].includes(upperPart)) {
+              position = upperPart;
+              postflopStatus = positionMap[upperPart] || 'Unknown';
+              break;
+            }
+            // Проверяем специальные случаи как c3bBU (call 3bet Button)
+            if (part.includes('BU') || part.includes('BTN')) {
+              position = 'BTN';
+              postflopStatus = 'IP';
+              break;
+            }
+          }
+        }
+
+        this.playerPositions.push({
+          name: playerName,
+          position: position,
+          postflopStatus: postflopStatus
+        });
+      }
+    });
+
+    // Вывод информации о позициях в консоль
+    console.log('=== Информация о позициях игроков ===');
+    this.playerPositions.forEach(player => {
+      console.log(`Игрок: ${player.name}, Позиция: ${player.position}, Постфлоп статус: ${player.postflopStatus}`);
+    });
+    console.log('=====================================');
 
     const text = this.preflopSpot;
     let parsedInfo = { ...defaultInfo };
@@ -1193,6 +1253,11 @@ class PokerTable {
     // Перейти к следующей улице
     const previousStreet = this.street;
     switch (this.street) {
+      case 'preflop':
+        // Симулятор начинает с флопа, этот case не должен выполняться
+        console.log('⚠️ Неожиданный переход с префлопа - симулятор должен начинать с флопа');
+        return;
+        break;
       case 'flop':
         this.dealTurn();
         console.log('🃏 Переход на терн');
@@ -1289,21 +1354,19 @@ class PokerTable {
     
     console.log('✨ Раздача завершена, готов к новой раздаче');
     
-    // 🔧 АВТОМАТИЧЕСКИЙ ЗАПУСК НОВОЙ РАЗДАЧИ
-    console.log('🔄 Автоматический запуск новой раздачи через 3 секунды...');
-    setTimeout(() => {
-      console.log('🎮 Запуск новой раздачи...');
-      
-      try {
-        this.startNewHand();
-        console.log(`🎮 Новая раздача #${this.handNumber} автоматически запущена`);
-        
-        // Уведомить игроков о начале новой раздачи
-        this.notifyPlayersOfNewHand();
-      } catch (error) {
-        console.error('❌ Ошибка при автоматическом запуске новой раздачи:', error);
-      }
-    }, 3000); // Задержка 3 секунды для демонстрации результатов
+    // Сброс состояния для возможности начать новую раздачу
+    this.currentHandHistory = null;
+    this.actions = [];
+    this.streetPots = { preflop: 0, flop: 0, turn: 0, river: 0 };
+    this.players.forEach(player => {
+      player.acted = false;
+      player.currentBet = 0;
+      player.folded = false;
+    });
+    this.currentBet = 0;
+    this.pot = 0;
+    this.street = 'waiting'; // Ожидание новой раздачи (симулятор начинает с флопа)
+    this.communityCards = [];
   }
 
   // 💾 Сохранить завершенную раздачу в накопительную историю
@@ -1426,6 +1489,9 @@ class PokerTable {
       // Если не действовал, не записываем вообще (undefined означает "не ходил")
     });
     
+    // Определить кто должен ходить
+    const activeToAct = this.getPlayerToAct();
+    
     return {
       tableId: this.tableId,
       players: Array.from(this.players.values()).map(p => ({
@@ -1436,6 +1502,7 @@ class PokerTable {
         folded: p.folded,
         currentBet: p.currentBet,
         acted: p.acted,
+        isActiveToAct: p.id === activeToAct,
         // Показать карты только запрашивающему игроку для его собственных карт
         cards: p.id === requestingPlayerId ? p.cards : [
           { rank: '?', suit: '?', hidden: true },
@@ -1451,8 +1518,62 @@ class PokerTable {
       streetBets: streetBets,
       preflopSpot: this.preflopSpot,
       handHistory: this.currentHandHistory,
-      handHistoryInfo: this.parseHandHistoryInfo()
+      handHistoryInfo: this.parseHandHistoryInfo(),
+      isHandActive: this.handNumber > 0,
+      activeToAct: activeToAct
     };
+  }
+
+  // Определить кто должен ходить
+  getPlayerToAct() {
+    const activePlayers = Array.from(this.players.values()).filter(p => !p.folded);
+    
+    if (activePlayers.length <= 1) {
+      return null; // Никто не должен ходить
+    }
+    
+    // Если торги завершены, никто не ходит
+    if (this.isBettingRoundComplete()) {
+      return null;
+    }
+    
+    console.log(`🎯 Определение очереди хода на улице: ${this.street}`);
+    console.log(`🎯 Активные игроки: ${activePlayers.map(p => `${p.name}(acted:${p.acted}, bet:${p.currentBet})`).join(', ')}`);
+    
+    // Поскольку симулятор начинает с флопа, используем только постфлоп логику
+    // Постфлоп: первым ходит игрок в позиции SB (или первый игрок), затем BB (или второй игрок)
+    const unactedPlayers = activePlayers.filter(p => !p.acted);
+    
+    if (unactedPlayers.length > 0) {
+      // Есть игроки которые еще не ходили
+      console.log(`🎯 Неходившие игроки: ${unactedPlayers.map(p => p.name).join(', ')}`);
+      
+      // В heads-up постфлоп первым ходит SB, если позиции не определены - первый игрок
+      const sbPlayer = unactedPlayers.find(p => p.position === 'SB');
+      if (sbPlayer) {
+        console.log(`🎯 Ход SB игрока: ${sbPlayer.name}`);
+        return sbPlayer.id;
+      }
+      
+      // Если SB нет среди неходивших или позиции не определены, берем первого
+      console.log(`🎯 Ход первого неходившего игрока: ${unactedPlayers[0].name}`);
+      return unactedPlayers[0].id;
+    }
+    
+    // Все ходили, проверяем равенство ставок
+    const bets = activePlayers.map(p => p.currentBet);
+    const maxBet = Math.max(...bets);
+    const playersToCall = activePlayers.filter(p => p.currentBet < maxBet);
+    
+    console.log(`🎯 Максимальная ставка: ${maxBet}, игроки которые должны доставить: ${playersToCall.map(p => `${p.name}(${p.currentBet})`).join(', ')}`);
+    
+    if (playersToCall.length > 0) {
+      console.log(`🎯 Ход игрока который должен доставить: ${playersToCall[0].name}`);
+      return playersToCall[0].id;
+    }
+    
+    console.log(`🎯 Торги завершены, никто не ходит`);
+    return null; // Торги завершены
   }
 
   exportHandHistory() {
@@ -1962,6 +2083,80 @@ io.on('connection', (socket) => {
       }
     }
     
+    // Извлечение и отображение информации о позициях игроков, дошедших до флопа
+    const positionMap = {
+      'SB': 'OOP',
+      'BB': 'OOP',
+      'EP': 'OOP',
+      'MP': 'OOP',
+      'CO': 'IP',
+      'BU': 'IP',
+      'BTN': 'IP',
+      'c3bBU': 'IP'  // Добавляем специальный случай для c3bBU (call 3bet Button)
+    };
+    const seatLines = data.settings.preflopSpot.split('\r\n').filter(line => line.startsWith('Seat '));
+    const playersOnFlop = [];
+
+    // Сначала соберем информацию о всех игроках
+    seatLines.forEach(line => {
+      const seatMatch = line.match(/Seat \d+: ([^\s]+) \(\$[0-9.]+ in chips\)/);
+      if (seatMatch) {
+        let playerName = seatMatch[1];
+        let position = 'Unknown';
+        let postflopStatus = 'Unknown';
+        
+        if (playerName.includes('_')) {
+          const parts = playerName.split('_');
+          for (const part of parts) {
+            const upperPart = part.toUpperCase();
+            if (['SB', 'BB', 'EP', 'MP', 'CO', 'BU', 'BTN'].includes(upperPart)) {
+              position = upperPart;
+              postflopStatus = positionMap[upperPart] || 'Unknown';
+              break;
+            }
+            // Проверяем специальные случаи как c3bBU (call 3bet Button)
+            if (part.includes('BU') || part.includes('BTN')) {
+              position = 'BTN';
+              postflopStatus = 'IP';
+              break;
+            }
+          }
+        }
+        
+        playersOnFlop.push({ 
+          name: playerName, 
+          position: position, 
+          postflopStatus: postflopStatus, 
+          folded: false 
+        });
+      }
+    });
+
+    // Теперь проверим, кто сделал фолд на префлопе
+    const preflopText = data.settings.preflopSpot;
+    const foldActions = preflopText.match(/([^:\r\n]+): folds/g);
+    if (foldActions) {
+      foldActions.forEach(action => {
+        const playerMatch = action.match(/^([^:]+): folds/);
+        if (playerMatch) {
+          const foldedPlayer = playerMatch[1];
+          const playerIndex = playersOnFlop.findIndex(p => p.name === foldedPlayer);
+          if (playerIndex !== -1) {
+            playersOnFlop[playerIndex].folded = true;
+          }
+        }
+      });
+    }
+
+    // Выводим только тех, кто не сделал фолд
+    const playersWhoSawFlop = playersOnFlop.filter(player => !player.folded);
+    console.log('=== 🃏 ИГРОКИ НА ФЛОПЕ ===');
+    console.log(`Всего игроков дошло до флопа: ${playersWhoSawFlop.length}`);
+    playersWhoSawFlop.forEach(player => {
+      console.log(`👤 ${player.name} | Позиция: ${player.position} | Статус: ${player.postflopStatus}`);
+    });
+    console.log('========================');
+    
     const session = new PokerSession(sessionId, userId, data.settings);
     session.addPlayer(userId, {
       name: data.playerName || 'Player 1',
@@ -2187,6 +2382,8 @@ io.on('connection', (socket) => {
       socket.emit('error', { message: 'Не удалось выполнить действие' });
     }
   });
+
+
 
   // Следующая улица
   socket.on('next-street', (data) => {
@@ -2467,6 +2664,222 @@ app.get('/api/handhistory/view/:filename', (req, res) => {
   }
 });
 
+// ===== API для ПРЕФЛОП СПОТОВ =====
+function scanDirectoryRecursive(dirPath, basePath = '') {
+  const items = [];
+  
+  if (!fs.existsSync(dirPath)) {
+    return items;
+  }
+  
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry.name);
+    const relativePath = basePath ? `${basePath}/${entry.name}` : entry.name;
+    
+    if (entry.isDirectory()) {
+      items.push({
+        type: 'folder',
+        name: entry.name,
+        path: relativePath,
+        children: [] // Не загружаем детей сразу - будут загружены по запросу
+      });
+    } else if (entry.isFile() && entry.name.endsWith('.txt')) {
+      const stats = fs.statSync(fullPath);
+      items.push({
+        type: 'file',
+        filename: entry.name,
+        path: relativePath,
+        name: entry.name.replace('.txt', '').replace(/_/g, ' '),
+        size: stats.size,
+        created: stats.birthtime,
+        modified: stats.mtime
+      });
+    }
+  }
+  
+  return items.sort((a, b) => {
+    if (a.type !== b.type) {
+      return a.type === 'folder' ? -1 : 1; // Папки сначала
+    }
+    return a.name.localeCompare(b.name);
+  });
+}
+
+app.get('/api/preflopspots', (req, res) => {
+  const preflopDir = path.join(__dirname, 'preflopspots');
+  
+  if (!fs.existsSync(preflopDir)) {
+    fs.mkdirSync(preflopDir, { recursive: true });
+    return res.json({ items: [] });
+  }
+  
+  try {
+    const items = scanDirectoryRecursive(preflopDir);
+    res.json({ items });
+  } catch (error) {
+    console.error('Ошибка чтения папки preflopspots:', error);
+    res.status(500).json({ error: 'Ошибка чтения префлоп спотов' });
+  }
+});
+
+app.get('/api/preflopspot/*', (req, res) => {
+  const requestPath = req.params[0]; // Получаем полный путь
+  
+  // Проверка безопасности
+  if (requestPath.includes('..')) {
+    return res.status(400).json({ error: 'Недопустимый путь' });
+  }
+  
+  const fullPath = path.join(__dirname, 'preflopspots', requestPath);
+  
+  if (!fs.existsSync(fullPath)) {
+    return res.status(404).json({ error: 'Путь не найден' });
+  }
+  
+  try {
+    const stats = fs.statSync(fullPath);
+    
+    if (stats.isDirectory()) {
+      // Если это папка, возвращаем её содержимое
+      const items = [];
+      const entries = fs.readdirSync(fullPath, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        const entryFullPath = path.join(fullPath, entry.name);
+        const entryRelativePath = `${requestPath}/${entry.name}`;
+        
+        if (entry.isDirectory()) {
+          items.push({
+            type: 'folder',
+            name: entry.name,
+            path: entryRelativePath,
+            children: []
+          });
+        } else if (entry.isFile() && entry.name.endsWith('.txt')) {
+          const stats = fs.statSync(entryFullPath);
+          items.push({
+            type: 'file',
+            filename: entry.name,
+            path: entryRelativePath,
+            name: entry.name.replace('.txt', '').replace(/_/g, ' '),
+            size: stats.size,
+            created: stats.birthtime,
+            modified: stats.mtime
+          });
+        }
+      }
+      
+      items.sort((a, b) => {
+        if (a.type !== b.type) {
+          return a.type === 'folder' ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+      
+      res.json({ items });
+    } else if (stats.isFile() && requestPath.endsWith('.txt')) {
+      // Если это файл .txt, возвращаем его содержимое
+      const content = fs.readFileSync(fullPath, 'utf8');
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.send(content);
+    } else {
+      return res.status(400).json({ error: 'Недопустимый тип файла' });
+    }
+  } catch (error) {
+    console.error('Ошибка чтения префлоп спота:', error);
+    res.status(500).json({ error: 'Ошибка чтения файла' });
+  }
+});
+
+// ===== API для РЕЙНДЖЕЙ =====
+app.get('/api/ranges', (req, res) => {
+  const rangesDir = path.join(__dirname, 'ranges');
+  
+  if (!fs.existsSync(rangesDir)) {
+    fs.mkdirSync(rangesDir, { recursive: true });
+    return res.json({ items: [] });
+  }
+  
+  try {
+    const items = scanDirectoryRecursive(rangesDir);
+    res.json({ items });
+  } catch (error) {
+    console.error('Ошибка чтения папки ranges:', error);
+    res.status(500).json({ error: 'Ошибка чтения рейнджей' });
+  }
+});
+
+app.get('/api/range/*', (req, res) => {
+  const requestPath = req.params[0]; // Получаем полный путь
+  
+  // Проверка безопасности
+  if (requestPath.includes('..')) {
+    return res.status(400).json({ error: 'Недопустимый путь' });
+  }
+  
+  const fullPath = path.join(__dirname, 'ranges', requestPath);
+  
+  if (!fs.existsSync(fullPath)) {
+    return res.status(404).json({ error: 'Путь не найден' });
+  }
+  
+  try {
+    const stats = fs.statSync(fullPath);
+    
+    if (stats.isDirectory()) {
+      // Если это папка, возвращаем её содержимое
+      const items = [];
+      const entries = fs.readdirSync(fullPath, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        const entryFullPath = path.join(fullPath, entry.name);
+        const entryRelativePath = `${requestPath}/${entry.name}`;
+        
+        if (entry.isDirectory()) {
+          items.push({
+            type: 'folder',
+            name: entry.name,
+            path: entryRelativePath,
+            children: []
+          });
+        } else if (entry.isFile() && entry.name.endsWith('.txt')) {
+          const stats = fs.statSync(entryFullPath);
+          items.push({
+            type: 'file',
+            filename: entry.name,
+            path: entryRelativePath,
+            name: entry.name.replace('.txt', '').replace(/_/g, ' '),
+            size: stats.size,
+            created: stats.birthtime,
+            modified: stats.mtime
+          });
+        }
+      }
+      
+      items.sort((a, b) => {
+        if (a.type !== b.type) {
+          return a.type === 'folder' ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+      
+      res.json({ items });
+    } else if (stats.isFile() && requestPath.endsWith('.txt')) {
+      // Если это файл .txt, возвращаем его содержимое
+      const content = fs.readFileSync(fullPath, 'utf8');
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.send(content);
+    } else {
+      return res.status(400).json({ error: 'Недопустимый тип файла' });
+    }
+  } catch (error) {
+    console.error('Ошибка чтения рейнджа:', error);
+    res.status(500).json({ error: 'Ошибка чтения файла' });
+  }
+});
+
 // Обработка ошибок
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -2493,4 +2906,4 @@ process.on('SIGTERM', () => {
   });
 });
 
-module.exports = app; 
+module.exports = app;

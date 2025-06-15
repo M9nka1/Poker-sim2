@@ -1,4 +1,33 @@
 // ===== ОСНОВНЫЕ ПЕРЕМЕННЫЕ И СОСТОЯНИЕ =====
+
+// Глобальный трекер обработчиков событий для предотвращения дублирования
+window.eventHandlersTracker = window.eventHandlersTracker || {
+  globalClickHandlers: new Set(),
+  renderTracker: new Set(),
+  addGlobalClickHandler: function(handlerId, handler) {
+    if (!this.globalClickHandlers.has(handlerId)) {
+      this.globalClickHandlers.add(handlerId);
+      document.addEventListener('click', handler);
+      console.log(`✅ Добавлен глобальный обработчик клика: ${handlerId}`);
+    } else {
+      console.log(`⚠️ Глобальный обработчик клика уже существует: ${handlerId}`);
+    }
+  },
+  checkRenderStatus: function(containerId, itemsCount) {
+    const renderKey = `${containerId}-${itemsCount}`;
+    if (this.renderTracker.has(renderKey)) {
+      console.log(`⚠️ Рендеринг уже выполнен для ${containerId} с ${itemsCount} элементами, пропускаем`);
+      return false; // Уже рендерился
+    }
+    this.renderTracker.add(renderKey);
+    return true; // Можно рендерить
+  },
+  clearRenderTracker: function() {
+    this.renderTracker.clear();
+    console.log('🧹 Очищен трекер рендеринга');
+  }
+};
+
 const state = {
   settings: {
     tablesCount: 1,
@@ -152,6 +181,16 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Добавление стилей столов
   addTableStyles();
+  
+  // Инициализация preflop selector
+  initializePreflopSelector();
+  
+  // Инициализация range селекторов
+  initializeRangeSelector('range-select-player1');
+  initializeRangeSelector('range-select-player2');
+  
+  // Загрузка списков файлов
+  loadPreflopSpotsList();
 });
 
 // ===== ОБРАБОТЧИКИ СОБЫТИЙ =====
@@ -173,11 +212,7 @@ function initializeEventListeners() {
     joinSessionBtn.addEventListener('click', joinSession);
   }
 
-  // Загрузка файла префлопа
-  const preflopFile = document.getElementById('preflop-file');
-  if (preflopFile) {
-    preflopFile.addEventListener('change', handlePreflopFile);
-  }
+
 
   // Настройки столов
   document.querySelectorAll('.table-btn').forEach(btn => {
@@ -318,20 +353,95 @@ function validateSettings() {
          state.settings.rakeDollar >= 0;
 }
 
-// ===== ЗАГРУЗКА ПРЕФЛОП ФАЙЛА =====
-function handlePreflopFile(event) {
-  const file = event.target.files[0];
-  if (file && file.type === 'text/plain') {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const content = e.target.result;
-      state.settings.preflopSpot = content;
+// ===== РАБОТА С ПРЕФЛОП СПОТАМИ =====
+
+async function loadPreflopSpot(filePath) {
+  try {
+    const response = await fetch(`/api/preflopspot/${filePath}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const content = await response.text();
+    state.settings.preflopSpot = content;
       
-      const preview = document.getElementById('preflop-content');
-      preview.textContent = content.substring(0, 200) + (content.length > 200 ? '...' : '');
-      preview.style.display = 'block';
-    };
-    reader.readAsText(file);
+    const preview = document.getElementById('preflop-content');
+    preview.textContent = content.substring(0, 200) + (content.length > 200 ? '...' : '');
+    preview.classList.add('show');
+    
+    const displayName = filePath.split('/').pop().replace('.txt', '').replace(/_/g, ' ');
+    showNotification(`Префлоп спот "${displayName}" загружен`, 'success');
+    syncGameSettings();
+  } catch (error) {
+    console.error('Ошибка загрузки префлоп спота:', error);
+    showNotification('Ошибка загрузки префлоп спота', 'error');
+  }
+}
+
+// ===== РАБОТА СО СТАНДАРТНЫМИ РЕЙНДЖАМИ =====
+
+async function loadRangePreset(filePath, playerNum = 1) {
+  // Используем переданный номер игрока (по умолчанию 1)
+  const targetPlayer = playerNum;
+  
+  console.log(`🎯 Загрузка рейнджа для игрока ${targetPlayer} из файла: ${filePath}`);
+  console.log(`🎯 State.settings существует:`, !!state.settings);
+  console.log(`🎯 PlayerRanges существует:`, !!state.settings?.playerRanges);
+
+  try {
+    const response = await fetch(`/api/range/${filePath}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const content = await response.text();
+    const player = targetPlayer === 1 ? 'player1' : 'player2';
+    
+    console.log(`📋 Загрузка рейнджа для ${player}:`);
+    console.log(`📋 Содержимое файла:`, content);
+    console.log(`📋 Текущие настройки игрока:`, state.settings.playerRanges[player]);
+    
+    // Парсить рейндж и применить к игроку
+    const hands = parseHandRange(content);
+    
+    if (hands.size > 0) {
+      console.log(`🎯 Успешно распарсено ${hands.size} рук из preset`);
+      
+      // Очистить текущий выбор
+      state.settings.playerRanges[player].handWeights = {};
+      
+      // Добавить новые руки с их частотами
+      hands.forEach((frequency, hand) => {
+        // Конвертируем частоту в проценты (0.25 → 25)
+        const percentage = Math.round(frequency * 100);
+        state.settings.playerRanges[player].handWeights[hand] = percentage;
+        console.log(`  ➕ ${hand}: ${frequency} → ${percentage}%`);
+      });
+      
+      // Обновить отображение
+      updateHandMatrixDisplay(player);
+      updateRangeStatistics(player);
+      
+      console.log(`✅ Рейндж для ${player} обновлен из preset "${filePath}"`);
+      
+      // Показать уведомление
+      const displayName = filePath.split('/').pop().replace('.txt', '').replace(/_/g, ' ');
+      showNotification(
+        `Рейндж для игрока ${targetPlayer} загружен из "${displayName}". Загружено ${hands.size} рук.`,
+        'success'
+      );
+    } else {
+      showNotification('Не удалось распарсить рейндж', 'error');
+    }
+    
+    // Закрыть модальное окно (только если вызвано через старый способ)
+    if (!playerNum && typeof closeRangePresetsDialog === 'function') {
+      closeRangePresetsDialog();
+    }
+    
+  } catch (error) {
+    console.error('Ошибка загрузки рейнджа:', error);
+    showNotification('Ошибка загрузки рейнджа', 'error');
   }
 }
 
@@ -519,18 +629,14 @@ function toggleHandSelection(cell, containerId) {
   // Если рука уже выбрана, убрать её
   if (state.settings.playerRanges[player].handWeights[hand]) {
     delete state.settings.playerRanges[player].handWeights[hand];
-    cell.classList.remove('selected');
-    cell.innerHTML = hand; // Вернуть обычный текст
   } else {
-    // Добавить руку с текущим весом
-    if (currentWeight > 0) {
-      state.settings.playerRanges[player].handWeights[hand] = currentWeight;
-      cell.classList.add('selected');
-      // Показать вес в ячейке
-      cell.innerHTML = `${hand}<br><small>${currentWeight}%</small>`;
-    }
+    // Добавить руку с текущим весом или 100% если вес не установлен
+    const weight = currentWeight > 0 ? currentWeight : 100;
+    state.settings.playerRanges[player].handWeights[hand] = weight;
   }
   
+  // Обновить отображение матрицы (без анимации увеличения)
+  updateHandMatrixDisplay(player);
   updateRangeStatistics(player);
 }
 
@@ -877,14 +983,26 @@ function processHandString(handPart, frequency) {
     // Проверяем что это валидные ранги карт
     if (CARD_RANKS.includes(firstChar) && CARD_RANKS.includes(secondChar)) {
       if (firstChar === secondChar) {
-        // Пара (AA, KK, etc.) - сохраняем как есть
+        // Пара (AA, KK, etc.) - сохраняем как есть в верхнем регистре
         result.set(normalizedHand, frequency);
         console.log(`    ✅ Пара: ${normalizedHand} → ${frequency}`);
       } else {
-        // Рука без указания s/o - добавляем обе версии, но в правильном формате
-        // Важно: сохраняем в формате как в матрице (первая буква больше второй + s/o)
-        const suitedHand = normalizedHand + 's';
-        const offsuitHand = normalizedHand + 'o';
+        // Рука без указания s/o - добавляем обе версии в правильном формате матрицы
+        // В матрице: старшая карта первая + s/o в нижнем регистре
+        const rank1Index = CARD_RANKS.indexOf(firstChar);
+        const rank2Index = CARD_RANKS.indexOf(secondChar);
+        
+        let hand;
+        if (rank1Index <= rank2Index) {
+          // firstChar старше или равен secondChar
+          hand = firstChar + secondChar;
+        } else {
+          // secondChar старше firstChar, меняем местами
+          hand = secondChar + firstChar;
+        }
+        
+        const suitedHand = hand + 's';
+        const offsuitHand = hand + 'o';
         result.set(suitedHand, frequency);
         result.set(offsuitHand, frequency);
         console.log(`    ✅ Обе версии: ${suitedHand} и ${offsuitHand} → ${frequency}`);
@@ -903,8 +1021,20 @@ function processHandString(handPart, frequency) {
       if (firstChar === secondChar) {
         console.warn(`    ❌ Пара не может иметь суффикс s/o: "${normalizedHand}"`);
       } else {
-        // Сохраняем руку в правильном формате
-        const correctedHand = normalizedHand.toLowerCase(); // Приводим к нижнему регистру для совместимости
+        // Приводим к правильному формату матрицы: старшая карта первая + s/o в нижнем регистре
+        const rank1Index = CARD_RANKS.indexOf(firstChar);
+        const rank2Index = CARD_RANKS.indexOf(secondChar);
+        
+        let hand;
+        if (rank1Index <= rank2Index) {
+          // firstChar старше или равен secondChar
+          hand = firstChar + secondChar;
+        } else {
+          // secondChar старше firstChar, меняем местами
+          hand = secondChar + firstChar;
+        }
+        
+        const correctedHand = hand + suitChar.toLowerCase();
         result.set(correctedHand, frequency);
         console.log(`    ✅ Специфичная рука: ${correctedHand} → ${frequency}`);
       }
@@ -1021,44 +1151,157 @@ function createPokerTable(tableNumber) {
     <div class="table-header">
       <h3><i class="fas fa-table"></i> Стол ${tableNumber}</h3>
       <div class="table-info">
-        <span><i class="fas fa-percentage"></i> ${state.settings.rakePercent}%</span>
-        <span><i class="fas fa-dollar-sign"></i> ${state.settings.rakeDollar}</span>
+        <span class="rake-info"><i class="fas fa-percentage"></i> ${state.settings.rakePercent}%</span>
+        <span class="rake-info"><i class="fas fa-dollar-sign"></i> ${state.settings.rakeDollar}</span>
       </div>
     </div>
-    <div class="table-board">
-      <div class="community-cards">
-        <div class="card-slot">?</div>
-        <div class="card-slot">?</div>
-        <div class="card-slot">?</div>
-        <div class="card-slot turn">?</div>
-        <div class="card-slot river">?</div>
-      </div>
-    </div>
-    <div class="table-players">
-      <div class="player player1">
-        <div class="player-info">
-          <h4>Игрок 1</h4>
-          <span class="player-range">${state.settings.playerRanges.player1.currentWeight}% рук</span>
-        </div>
-        <div class="player-cards">
-          <div class="card-slot">?</div>
-          <div class="card-slot">?</div>
-        </div>
-      </div>
-      <div class="player player2">
-        <div class="player-info">
-          <h4>Игрок 2</h4>
-          <span class="player-range">${state.settings.playerRanges.player2.currentWeight}% рук</span>
-        </div>
-        <div class="player-cards">
-          <div class="card-slot">?</div>
-          <div class="card-slot">?</div>
+    
+    <!-- Основная игровая область с фиксированными пропорциями -->
+    <div class="table-felt">
+      <!-- Верхний ряд игроков -->
+      <div class="players-top table-row">
+        <div class="player-seat seat-1 position-${state.settings.playerRanges.positions?.player1?.toLowerCase() || 'btn'} center-aligned">
+          <div class="player-avatar">
+            <i class="fas fa-user"></i>
+          </div>
+          <div class="player-info">
+            <div class="player-name">Игрок 1</div>
+          </div>
+          <div class="position-stack-box">
+            <div class="player-position">${state.settings.playerRanges.positions?.player1 || 'BTN'}</div>
+            <div class="player-stack">$1000</div>
+          </div>
+          <div class="player-cards center-aligned">
+            <div class="card-slot hole-card">?</div>
+            <div class="card-slot hole-card">?</div>
+          </div>
+          <div class="player-action center-aligned">
+            <span class="action-text">Ожидание...</span>
+            <span class="bet-amount">$0</span>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="table-actions">
-      <button class="btn btn-primary"><i class="fas fa-play"></i> Начать раздачу</button>
-      <button class="btn btn-secondary"><i class="fas fa-redo"></i> Новая раздача</button>
+      
+      <!-- Центр стола -->
+      <div class="table-center table-row">
+        <div class="pot-area center-aligned">
+          <div class="pot-total">
+            <span class="pot-label">Банк</span>
+            <span class="pot-amount">$0</span>
+          </div>
+        </div>
+        
+        <div class="community-cards center-aligned">
+          <div class="card-slot community flop">?</div>
+          <div class="card-slot community flop">?</div>
+          <div class="card-slot community flop">?</div>
+          <div class="card-slot community turn">?</div>
+          <div class="card-slot community river">?</div>
+        </div>
+        
+        <div class="table-dealer">
+          <div class="dealer-button">D</div>
+        </div>
+      </div>
+      
+      <!-- Нижний ряд игроков -->
+      <div class="players-bottom table-row">
+        <div class="player-seat seat-2 position-${state.settings.playerRanges.positions?.player2?.toLowerCase() || 'bb'} center-aligned">
+          <div class="player-action center-aligned">
+            <span class="action-text">Ожидание...</span>
+            <span class="bet-amount">$0</span>
+          </div>
+          <div class="player-cards center-aligned">
+            <div class="card-slot hole-card">?</div>
+            <div class="card-slot hole-card">?</div>
+          </div>
+          <div class="player-info">
+            <div class="player-name">Игрок 2</div>
+          </div>
+          <div class="position-stack-box">
+            <div class="player-position">${state.settings.playerRanges.positions?.player2 || 'BB'}</div>
+            <div class="player-stack">$1000</div>
+          </div>
+          <div class="player-avatar">
+            <i class="fas fa-user"></i>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Ряд 4: Позиция и стек -->
+      <div class="position-stack-row table-row">
+        <div class="position-stack-element center-aligned">
+          <div class="position-stack-box-bottom">
+            <div class="player-position-bottom">${state.settings.playerRanges.positions?.player2 || 'BB'}</div>
+            <div class="player-stack-bottom">$1000</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Ряд 5: Карты игрока -->
+      <div class="player-cards-row table-row">
+        <div class="player-cards-element center-aligned">
+          <div class="player-cards-bottom">
+            <div class="card-slot hole-card-bottom">?</div>
+            <div class="card-slot hole-card-bottom">?</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Ряд 6: Кнопки управления -->
+      <div class="action-controls-row table-row">
+        <div class="action-control-element center-aligned">
+          <!-- Кнопки действий -->
+          <div class="action-buttons-row">
+            <button class="action-btn fold-btn" disabled>
+              <i class="fas fa-times"></i>
+              <span>Fold</span>
+            </button>
+            <button class="action-btn check-btn" disabled>
+              <i class="fas fa-check"></i>
+              <span>Check</span>
+            </button>
+            <button class="action-btn call-btn" disabled>
+              <i class="fas fa-phone"></i>
+              <span>Call $0</span>
+            </button>
+            <button class="action-btn raise-btn" disabled>
+              <i class="fas fa-arrow-up"></i>
+              <span>Raise</span>
+            </button>
+          </div>
+          
+          <!-- Размер ставки -->
+          <div class="bet-sizing-row">
+            <div class="bet-slider-container">
+              <input type="range" class="bet-slider" min="0" max="1000" value="0" step="5">
+              <div class="bet-amount-display">$0</div>
+            </div>
+            <div class="bet-presets">
+              <button class="bet-preset" data-size="0.5">1/2</button>
+              <button class="bet-preset" data-size="0.75">3/4</button>
+              <button class="bet-preset" data-size="1">Pot</button>
+              <button class="bet-preset" data-size="1000">All-in</button>
+            </div>
+          </div>
+          
+          <!-- Управление столом -->
+          <div class="table-controls-row">
+            <button class="table-btn deal-btn">
+              <i class="fas fa-play"></i>
+              <span>Начать</span>
+            </button>
+            <button class="table-btn reset-btn">
+              <i class="fas fa-redo"></i>
+              <span>Сброс</span>
+            </button>
+            <button class="table-btn auto-btn">
+              <i class="fas fa-robot"></i>
+              <span>Авто</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   `;
   
@@ -1209,97 +1452,799 @@ function throttle(func, limit) {
 function addTableStyles() {
   const style = document.createElement('style');
   style.textContent = `
+    /* ===== ОСНОВНЫЕ СТИЛИ СТОЛА ===== */
+    .poker-table {
+      background: linear-gradient(135deg, #1a2c3f 0%, #2d4f6b 100%);
+      border-radius: 12px;
+      border: 2px solid var(--border-primary);
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      margin-bottom: 20px;
+      /* Устанавливаем центральную ось стола */
+      --table-center-axis: 50%;
+    }
+    
     .table-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
+      padding: 15px 20px;
+      background: rgba(0, 0, 0, 0.2);
       border-bottom: 1px solid var(--border-primary);
+    }
+    
+    .table-header h3 {
+      margin: 0;
+      color: var(--accent-primary);
+      font-size: 1.1rem;
     }
     
     .table-info {
       display: flex;
       gap: 15px;
-      font-size: 0.9rem;
-      color: var(--text-secondary);
     }
     
-    .table-board {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    
-    .community-cards {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      margin-bottom: 15px;
-    }
-    
-    .card-slot {
-      width: 50px;
-      height: 70px;
-      background: var(--bg-tertiary);
-      border: 2px dashed var(--border-secondary);
-      border-radius: var(--border-radius);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.9rem;
-      color: var(--text-muted);
-    }
-    
-    .card-slot.turn, .card-slot.river {
-      opacity: 0.5;
-    }
-    
-    .table-players {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 20px;
-    }
-    
-    .player {
-      flex: 1;
-      margin: 0 10px;
-    }
-    
-    .player-info {
-      text-align: center;
-      margin-bottom: 10px;
-    }
-    
-    .player-info h4 {
-      margin-bottom: 5px;
-      color: var(--accent-primary);
-    }
-    
-    .player-range {
+    .rake-info {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 4px 8px;
+      border-radius: 4px;
       font-size: 0.8rem;
       color: var(--text-secondary);
     }
     
+    /* ===== ИГРОВОЕ ПОЛЕ С ФИКСИРОВАННЫМИ ПРОПОРЦИЯМИ ===== */
+    .table-felt {
+      background: radial-gradient(ellipse at center, #0f5f3f 0%, #0a4a30 100%);
+      position: relative;
+      height: 600px; /* Фиксированная высота */
+      padding: 20px;
+      display: grid;
+      grid-template-rows: 1fr 2fr 1fr 60px 60px 60px; /* Пропорции: верх 1, центр 2, низ 1, позиция/стек 60px, карты 60px, кнопки 60px */
+      gap: 8px;
+      overflow: hidden;
+    }
+    
+    .table-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+    
+    /* Направляющая линия по центру стола (для отладки) */
+    .table-row::before {
+      content: '';
+      position: absolute;
+      left: var(--table-center-axis);
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: rgba(255, 255, 255, 0.05);
+      z-index: 0;
+      pointer-events: none;
+    }
+    
+    /* Класс для элементов, которые должны быть на центральной оси */
+    .center-aligned {
+      position: relative;
+      left: 50%;
+      transform: translateX(-50%);
+      /* Гарантируем точное позиционирование */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    /* ===== ИГРОКИ ===== */
+    .players-top, .players-bottom {
+      /* Стили уже определены в .table-row */
+      width: 100%;
+    }
+    
+    .player-seat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 10px;
+      border: 2px solid transparent;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(5px);
+      transition: all 0.3s ease;
+      position: relative;
+      min-width: 180px;
+    }
+    
+    .player-seat.center-aligned {
+      /* Особые стили для центрированных игроков */
+      margin: 0;
+      width: fit-content;
+    }
+    
+    .players-bottom .player-seat {
+      flex-direction: column-reverse;
+    }
+    
+    /* Цветовые линии для позиций */
+    .player-seat.position-btn { border-color: #ff6b35; }  /* Оранжевый для BTN */
+    .player-seat.position-bb { border-color: #4ecdc4; }   /* Бирюзовый для BB */
+    .player-seat.position-sb { border-color: #45b7d1; }   /* Синий для SB */
+    .player-seat.position-ep { border-color: #f7d794; }   /* Желтый для EP */
+    .player-seat.position-mp { border-color: #c44569; }   /* Розовый для MP */
+    .player-seat.position-co { border-color: #6c5ce7; }   /* Фиолетовый для CO */
+    
+    .player-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--accent-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.2rem;
+    }
+    
+    .player-info {
+      text-align: center;
+      color: white;
+    }
+    
+    .player-name {
+      font-weight: bold;
+      font-size: 0.9rem;
+      margin-bottom: 2px;
+    }
+    
+    /* ===== ЗЕЛЕНЫЙ БОКС ПОЗИЦИИ И СТЕКА ===== */
+    .position-stack-box {
+      background: rgba(46, 204, 113, 0.15);
+      border: 2px solid #2ecc71;
+      border-radius: 8px;
+      padding: 6px 8px;
+      margin: 6px auto;
+      width: 100px;
+      max-width: 100%;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(46, 204, 113, 0.3);
+      backdrop-filter: blur(3px);
+      position: relative;
+      box-sizing: border-box;
+    }
+    
+    .position-stack-box::before {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: -1px;
+      right: -1px;
+      bottom: -1px;
+      background: linear-gradient(45deg, #2ecc71, #27ae60, #2ecc71);
+      border-radius: 8px;
+      z-index: -1;
+      opacity: 0.7;
+    }
+    
+    .player-position {
+      background: linear-gradient(135deg, #2ecc71, #27ae60);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      margin-bottom: 4px;
+      display: inline-block;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .player-stack {
+      font-size: 0.85rem;
+      color: #f1c40f;
+      font-weight: bold;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+      display: block;
+    }
+    
     .player-cards {
       display: flex;
-      gap: 5px;
+      gap: 4px;
       justify-content: center;
     }
     
-    .player-cards .card-slot {
+    .player-cards.center-aligned {
+      margin: 0;
+      width: fit-content;
+    }
+    
+    .card-slot.hole-card {
+      width: 35px;
+      height: 50px;
+      background: linear-gradient(145deg, #ffffff, #f0f0f0);
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      color: #666;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .player-action {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px 8px;
+      border-radius: 6px;
+      text-align: center;
+      min-width: 80px;
+    }
+    
+    /* Специальные стили для центрированных элементов */
+    .player-action.center-aligned {
+      margin: 0;
+      width: fit-content;
+    }
+    
+    .action-text {
+      display: block;
+      font-size: 0.7rem;
+      color: #ccc;
+    }
+    
+    .bet-amount {
+      display: block;
+      font-weight: bold;
+      color: #ffd700;
+      font-size: 0.8rem;
+    }
+    
+    /* ===== ЦЕНТР СТОЛА ===== */
+    .table-center {
+      flex-direction: column;
+      gap: 15px;
+    }
+    
+    .pot-area {
+      text-align: center;
+    }
+    
+    .pot-area.center-aligned {
+      margin: 0 auto;
+      width: fit-content;
+    }
+    
+    .pot-total {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 215, 0, 0.3);
+    }
+    
+    .pot-label {
+      display: block;
+      font-size: 0.7rem;
+      color: #ccc;
+      margin-bottom: 2px;
+    }
+    
+    .pot-amount {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #ffd700;
+    }
+    
+    .community-cards {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+    
+    .community-cards.center-aligned {
+      margin: 0;
+      width: fit-content;
+    }
+    
+    .card-slot.community {
+      width: 50px;
+      height: 70px;
+      background: linear-gradient(145deg, #ffffff, #f0f0f0);
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      color: #666;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
+    }
+    
+    .card-slot.community.turn, .card-slot.community.river {
+      opacity: 0.6;
+      transform: scale(0.95);
+    }
+    
+    .table-dealer {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+    }
+    
+    .dealer-button {
+      width: 30px;
+      height: 30px;
+      background: #ff6b35;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 0.8rem;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* ===== НОВЫЕ ОТДЕЛЬНЫЕ РЯДЫ УПРАВЛЕНИЯ ===== */
+    .position-stack-row,
+    .player-cards-row,
+    .action-controls-row {
+      background: rgba(44, 62, 80, 0.3);
+      border-radius: 8px;
+      margin: 0 -20px; /* Расширяем до краев */
+      padding: 8px 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .position-stack-row {
+      background: rgba(46, 204, 113, 0.1);
+      border: 1px solid rgba(46, 204, 113, 0.3);
+    }
+    
+    .player-cards-row {
+      background: rgba(52, 152, 219, 0.1);
+      border: 1px solid rgba(52, 152, 219, 0.3);
+    }
+    
+    .action-controls-row {
+      background: rgba(155, 89, 182, 0.1);
+      border: 1px solid rgba(155, 89, 182, 0.3);
+    }
+    
+    /* ===== ЭЛЕМЕНТ 1: ПОЗИЦИЯ И СТЕК ===== */
+    .position-stack-element {
+      width: fit-content;
+    }
+    
+    .position-stack-box-bottom {
+      background: rgba(46, 204, 113, 0.15);
+      border: 2px solid #2ecc71;
+      border-radius: 8px;
+      padding: 6px 8px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(46, 204, 113, 0.3);
+      backdrop-filter: blur(3px);
+      position: relative;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box; /* Включаем границы в общую ширину */
+    }
+    
+    .position-stack-box-bottom::before {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: -1px;
+      right: -1px;
+      bottom: -1px;
+      background: linear-gradient(45deg, #2ecc71, #27ae60, #2ecc71);
+      border-radius: 8px;
+      z-index: -1;
+      opacity: 0.7;
+    }
+    
+    .player-position-bottom {
+      background: linear-gradient(135deg, #2ecc71, #27ae60);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      margin-bottom: 4px;
+      display: inline-block;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .player-stack-bottom {
+      font-size: 0.85rem;
+      color: #f1c40f;
+      font-weight: bold;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+      display: block;
+    }
+    
+    /* ===== ЭЛЕМЕНТ 2: КАРТЫ ИГРОКА ===== */
+    .player-cards-element {
+      max-width: 120px;
+    }
+    
+    .player-cards-bottom {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+    }
+    
+    .card-slot.hole-card-bottom {
       width: 40px;
       height: 56px;
-    }
-    
-    .table-actions {
+      background: linear-gradient(145deg, #ffffff, #f0f0f0);
+      border: 2px solid #ddd;
+      border-radius: 6px;
       display: flex;
-      gap: 10px;
+      align-items: center;
       justify-content: center;
+      font-size: 0.9rem;
+      color: #666;
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
     }
     
-    .table-actions .btn {
-      padding: 8px 16px;
-      font-size: 0.85rem;
+    .card-slot.hole-card-bottom:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* ===== ЭЛЕМЕНТ 3: КНОПКИ УПРАВЛЕНИЯ ===== */
+    .action-control-element {
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    
+    .action-buttons-row,
+    .bet-sizing-row,
+    .table-controls-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+    
+    .action-btn {
+      background: linear-gradient(145deg, #3498db, #2980b9);
+      border: none;
+      border-radius: 6px;
+      padding: 6px 8px;
+      color: white;
+      font-size: 0.7rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+      min-width: 50px;
+      flex: 1;
+    }
+    
+    .action-btn:disabled {
+      background: linear-gradient(145deg, #7f8c8d, #95a5a6);
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    
+    .action-btn:not(:disabled):hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    
+    .fold-btn:not(:disabled) { background: linear-gradient(145deg, #e74c3c, #c0392b); }
+    .check-btn:not(:disabled) { background: linear-gradient(145deg, #27ae60, #229954); }
+    .call-btn:not(:disabled) { background: linear-gradient(145deg, #f39c12, #e67e22); }
+    .raise-btn:not(:disabled) { background: linear-gradient(145deg, #9b59b6, #8e44ad); }
+    
+    .action-btn i {
+      font-size: 0.9rem;
+    }
+    
+    .action-btn span {
+      font-size: 0.6rem;
+    }
+    
+    .bet-slider-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+    }
+    
+    .bet-slider {
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: #34495e;
+      outline: none;
+      -webkit-appearance: none;
+      min-width: 80px;
+    }
+    
+    .bet-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-primary);
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+    
+    .bet-amount-display {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 3px 6px;
+      border-radius: 3px;
+      color: #ffd700;
+      font-weight: bold;
+      font-size: 0.75rem;
+      min-width: 45px;
+      text-align: center;
+    }
+    
+    .bet-presets {
+      display: flex;
+      gap: 3px;
+    }
+    
+    .bet-preset {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      padding: 2px 4px;
+      color: white;
+      font-size: 0.6rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      flex: 1;
+      min-width: 30px;
+    }
+    
+    .bet-preset:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: var(--accent-primary);
+    }
+    
+    .table-btn {
+      background: linear-gradient(145deg, #2c3e50, #34495e);
+      border: 1px solid var(--border-primary);
+      border-radius: 4px;
+      padding: 4px 6px;
+      color: white;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+      min-width: 50px;
+      flex: 1;
+    }
+    
+    .table-btn:hover {
+      background: linear-gradient(145deg, #34495e, #2c3e50);
+      transform: translateY(-1px);
+    }
+    
+    .deal-btn { border-color: #27ae60; }
+    .reset-btn { border-color: #e74c3c; }
+    .auto-btn { border-color: #f39c12; }
+    
+    .table-btn i {
+      font-size: 0.8rem;
+    }
+    
+    .table-btn span {
+      font-size: 0.6rem;
+    }
+    
+    /* ===== АДАПТИВНОСТЬ С ПРОПОРЦИОНАЛЬНЫМ МАСШТАБИРОВАНИЕМ ===== */
+    @media (max-width: 1200px) {
+      .table-felt {
+        height: 500px; /* Уменьшенная высота для средних экранов */
+        padding: 15px;
+        grid-template-rows: 1fr 2fr 1fr 50px 50px 50px; /* Уменьшенные ряды управления */
+        gap: 6px;
+      }
+      
+      /* Сохраняем центрирование на средних экранах */
+      .center-aligned {
+        left: 50%;
+        transform: translateX(-50%);
+      }
+      
+      .position-stack-row,
+      .player-cards-row,
+      .action-controls-row {
+        margin: 0 -15px;
+        padding: 6px 15px;
+      }
+      
+      .action-btn,
+      .table-btn {
+        min-width: 45px;
+        padding: 5px 4px;
+        font-size: 0.65rem;
+      }
+      
+      .bet-preset {
+        font-size: 0.55rem;
+        padding: 2px 3px;
+      }
+      
+      .card-slot.community {
+        width: 45px;
+        height: 63px;
+      }
+      
+      .card-slot.hole-card {
+        width: 32px;
+        height: 45px;
+      }
+      
+      .position-stack-element {
+        width: 100%;
+        overflow: hidden;
+      }
+      
+      .position-stack-box-bottom {
+        padding: 5px 7px;
+        font-size: 0.85rem;
+      }
+      
+      .player-position-bottom {
+        font-size: 0.7rem;
+        padding: 2px 7px;
+      }
+      
+      .player-stack-bottom {
+        font-size: 0.8rem;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .table-felt {
+        height: 450px; /* Компактная высота для планшетов */
+        padding: 12px;
+        grid-template-rows: 0.8fr 1.8fr 0.8fr 45px 45px 45px; /* Более компактные пропорции */
+        gap: 6px;
+      }
+      
+      .position-stack-row,
+      .player-cards-row,
+      .action-controls-row {
+        margin: 0 -12px;
+        padding: 6px 12px;
+      }
+      
+      .action-buttons-row,
+      .bet-sizing-row,
+      .table-controls-row {
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      
+      .action-btn,
+      .table-btn {
+        min-width: 40px;
+        font-size: 0.6rem;
+      }
+      
+      .card-slot.hole-card-bottom {
+        width: 35px;
+        height: 50px;
+      }
+      
+      .card-slot.community {
+        width: 40px;
+        height: 56px;
+      }
+      
+      .card-slot.hole-card {
+        width: 28px;
+        height: 40px;
+      }
+      
+      /* Сохраняем центрирование на планшетах */
+      .center-aligned {
+        left: 50%;
+        transform: translateX(-50%);
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .table-felt {
+        height: 380px; /* Минимальная высота для мобильных */
+        padding: 10px;
+        grid-template-rows: 0.7fr 1.6fr 0.7fr 40px 40px 40px; /* Еще более компактные пропорции */
+        gap: 4px;
+      }
+      
+      .position-stack-row,
+      .player-cards-row,
+      .action-controls-row {
+        margin: 0 -10px;
+        padding: 4px 10px;
+      }
+      
+      .action-btn,
+      .table-btn {
+        min-width: 35px;
+        padding: 3px 2px;
+        font-size: 0.55rem;
+      }
+      
+      .action-btn i,
+      .table-btn i {
+        font-size: 0.7rem;
+      }
+      
+      .action-btn span,
+      .table-btn span {
+        font-size: 0.5rem;
+      }
+      
+      .bet-slider {
+        min-width: 60px;
+      }
+      
+      .bet-amount-display {
+        font-size: 0.7rem;
+        min-width: 40px;
+      }
+      
+      .bet-preset {
+        font-size: 0.5rem;
+        min-width: 25px;
+      }
+      
+      .card-slot.community {
+        width: 35px;
+        height: 49px;
+      }
+      
+      .card-slot.hole-card {
+        width: 25px;
+        height: 35px;
+      }
+      
+      .position-stack-element {
+        width: 100%;
+        overflow: hidden;
+      }
+      
+      .position-stack-box-bottom {
+        padding: 4px 6px;
+        font-size: 0.8rem;
+      }
+      
+      .player-position-bottom {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+      }
+      
+      .player-stack-bottom {
+        font-size: 0.75rem;
+      }
+      
+      /* Сохраняем центрирование на мобильных */
+      .center-aligned {
+        left: 50%;
+        transform: translateX(-50%);
+      }
     }
   `;
   
@@ -1525,6 +2470,557 @@ function testUserSpecificExample() {
   });
   
   return result;
+}
+
+// ===== ЗАГРУЗКА СПИСКОВ ФАЙЛОВ =====
+function renderPreflopSpotItems(items, container, level = 0, selectContainer = null) {
+    // Находим корневой контейнер селектора, если не передан
+    if (!selectContainer) {
+        selectContainer = document.querySelector('.preflop-selector .custom-select-container');
+    }
+    
+    // Проверяем дублирование рендеринга на корневом уровне
+    if (level === 0) {
+        const containerId = container.id || container.className || 'preflop-container';
+        if (!window.eventHandlersTracker.checkRenderStatus(containerId, items.length)) {
+            return; // Уже рендерился, пропускаем
+        }
+        container.innerHTML = '';
+    }
+    
+    console.log(`📝 Рендеринг ${items.length} элементов на уровне ${level}`);
+    
+    // Дополнительная защита от дублирования рендеринга
+    if (level === 0 && container.children.length > 0) {
+        console.log('⚠️ Контейнер уже содержит элементы, очищаем для избежания дублирования');
+        container.innerHTML = '';
+    }
+    
+    // Группируем элементы по типу
+    const folders = items.filter(item => item.type === 'folder');
+    const files = items.filter(item => item.type === 'file');
+    
+    // Сначала папки
+    folders.forEach(folder => {
+        const folderDiv = document.createElement('div');
+        folderDiv.className = 'preflop-folder-header';
+        folderDiv.style.paddingLeft = `${level * 20 + 10}px`;
+        folderDiv.setAttribute('data-folder-path', folder.path);
+        
+        folderDiv.innerHTML = `
+            <span class="preflop-folder-toggle">▶</span>
+            <span class="preflop-folder-name">${folder.name}</span>
+        `;
+        
+        const folderContent = document.createElement('div');
+        folderContent.className = 'preflop-folder-content';
+        folderContent.style.maxHeight = '0px';
+        folderContent.style.overflow = 'hidden';
+        folderContent.style.transition = 'max-height 0.3s ease';
+        folderContent.setAttribute('data-folder-content', folder.path);
+        
+        folderDiv.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            const toggle = folderDiv.querySelector('.preflop-folder-toggle');
+            const isExpanded = toggle.textContent === '▼';
+            
+            if (isExpanded) {
+                // Сворачиваем папку
+                folderContent.style.maxHeight = '0px';
+                toggle.textContent = '▶';
+            } else {
+                // Разворачиваем папку
+                toggle.textContent = '▼';
+                
+                // Если содержимое уже загружено, просто показываем его
+                if (folderContent.children.length > 0) {
+                    folderContent.style.maxHeight = folderContent.scrollHeight + 'px';
+                } else {
+                    // Загружаем содержимое папки
+                    fetch(`/api/preflopspot/${encodeURIComponent(folder.path)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log(`Загружено содержимое папки ${folder.name}:`, data);
+                            const selectContainer = document.querySelector('.preflop-selector .custom-select-container');
+                            renderPreflopSpotItems(data.items, folderContent, level + 1, selectContainer);
+                            // Устанавливаем высоту после рендеринга
+                            setTimeout(() => {
+                                folderContent.style.maxHeight = folderContent.scrollHeight + 'px';
+                            }, 10);
+                        })
+                        .catch(error => {
+                            console.error('Ошибка загрузки папки:', error);
+                            folderContent.innerHTML = `<div style="padding: 10px; color: #ef4444;">Ошибка загрузки</div>`;
+                            folderContent.style.maxHeight = '40px';
+                        });
+                }
+            }
+        });
+        
+        container.appendChild(folderDiv);
+        container.appendChild(folderContent);
+    });
+    
+    // Затем файлы
+    files.forEach(file => {
+        const fileDiv = document.createElement('div');
+        fileDiv.className = 'preflop-file-item';
+        fileDiv.style.paddingLeft = `${level * 20 + 30}px`;
+        fileDiv.innerHTML = `
+            <span class="preflop-file-icon">📄</span>
+            <span class="preflop-file-name">${file.name}</span>
+        `;
+        
+        fileDiv.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            loadPreflopSpot(file.path);
+            // Скрыть dropdown и обновить trigger
+            const selectContainer = document.querySelector('.preflop-selector .custom-select-container');
+            
+            if (selectContainer) {
+                const dropdown = selectContainer.querySelector('.select-dropdown');
+                const trigger = selectContainer.querySelector('.select-trigger');
+                const triggerText = selectContainer.querySelector('.select-text');
+                
+                if (dropdown) dropdown.classList.remove('active');
+                if (trigger) trigger.classList.remove('active');
+                if (triggerText) triggerText.textContent = file.name;
+                
+                // Возвращаем dropdown в исходный контейнер
+                if (dropdown && dropdown.parentElement === document.body) {
+                    document.body.removeChild(dropdown);
+                    selectContainer.appendChild(dropdown);
+                }
+            }
+        });
+        
+        container.appendChild(fileDiv);
+    });
+}
+
+// ===== RANGE SELECTOR FUNCTIONS =====
+function renderRangeSelectItems(items, container, level = 0, selectContainer = null) {
+    // Находим корневой контейнер селектора для определения игрока
+    if (!selectContainer) {
+        selectContainer = container.closest('.custom-select-container');
+    }
+    
+    if (!selectContainer) {
+        console.error('❌ Не найден корневой контейнер селектора');
+        return;
+    }
+    
+    const playerNum = selectContainer.id.includes('player1') ? 1 : 2;
+    
+    // Проверяем дублирование рендеринга на корневом уровне
+    if (level === 0) {
+        const containerId = `range-player${playerNum}-${container.className}`;
+        if (!window.eventHandlersTracker.checkRenderStatus(containerId, items.length)) {
+            return; // Уже рендерился, пропускаем
+        }
+        container.innerHTML = '';
+    }
+    
+    console.log(`🎯 Рендеринг элементов рейнджей для игрока ${playerNum} (${items.length} элементов на уровне ${level})`);
+    
+    // Дополнительная защита от дублирования рендеринга
+    if (level === 0 && container.children.length > 0) {
+        console.log('⚠️ Контейнер рейнджей уже содержит элементы, очищаем для избежания дублирования');
+        container.innerHTML = '';
+    }
+    
+    // Группируем элементы по типу
+    const folders = items.filter(item => item.type === 'folder');
+    const files = items.filter(item => item.type === 'file');
+    
+    // Сначала папки
+    folders.forEach(folder => {
+        const folderDiv = document.createElement('div');
+        folderDiv.className = 'range-folder-header';
+        folderDiv.style.paddingLeft = `${level * 20 + 10}px`;
+        folderDiv.setAttribute('data-folder-path', folder.path);
+        
+        folderDiv.innerHTML = `
+            <span class="folder-toggle">▶</span>
+            <span class="folder-name">${folder.name}</span>
+        `;
+        
+        const folderContent = document.createElement('div');
+        folderContent.className = 'folder-content';
+        folderContent.style.maxHeight = '0px';
+        folderContent.style.overflow = 'hidden';
+        folderContent.style.transition = 'max-height 0.3s ease';
+        folderContent.setAttribute('data-folder-content', folder.path);
+        
+        folderDiv.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            const toggle = folderDiv.querySelector('.folder-toggle');
+            const isExpanded = toggle.textContent === '▼';
+            
+            if (isExpanded) {
+                // Сворачиваем папку
+                folderContent.style.maxHeight = '0px';
+                toggle.textContent = '▶';
+            } else {
+                // Разворачиваем папку
+                toggle.textContent = '▼';
+                
+                // Если содержимое уже загружено, просто показываем его
+                if (folderContent.children.length > 0) {
+                    folderContent.style.maxHeight = folderContent.scrollHeight + 'px';
+                } else {
+                    // Загружаем содержимое папки
+                    fetch(`/api/range/${encodeURIComponent(folder.path)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log(`Загружено содержимое папки рейнджей ${folder.name}:`, data);
+                            renderRangeSelectItems(data.items, folderContent, level + 1, selectContainer);
+                            // Устанавливаем высоту после рендеринга
+                            setTimeout(() => {
+                                folderContent.style.maxHeight = folderContent.scrollHeight + 'px';
+                            }, 10);
+                        })
+                        .catch(error => {
+                            console.error('Ошибка загрузки папки рейнджей:', error);
+                            folderContent.innerHTML = `<div style="padding: 10px; color: #ef4444;">Ошибка загрузки</div>`;
+                            folderContent.style.maxHeight = '40px';
+                        });
+                }
+            }
+        });
+        
+        container.appendChild(folderDiv);
+        container.appendChild(folderContent);
+    });
+    
+    // Затем файлы
+    files.forEach(file => {
+        const fileDiv = document.createElement('div');
+        fileDiv.className = 'range-preset-item';
+        fileDiv.style.paddingLeft = `${level * 20 + 30}px`;
+        fileDiv.innerHTML = `
+            <span class="file-icon">📄</span>
+            <span class="file-name">${file.name}</span>
+        `;
+        
+        fileDiv.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            console.log(`🎯 Обработка клика по файлу рейнджа для игрока ${playerNum}:`, file.path);
+            
+            loadRangePreset(file.path, playerNum);
+            
+            // Скрыть dropdown и обновить trigger
+            const dropdown = selectContainer.querySelector('.select-dropdown');
+            const trigger = selectContainer.querySelector('.select-trigger');
+            const triggerText = selectContainer.querySelector('.select-text');
+            
+            if (dropdown) dropdown.classList.remove('active');
+            if (trigger) trigger.classList.remove('active');
+            if (triggerText) triggerText.textContent = file.name;
+            
+            // Возвращаем dropdown в исходный контейнер
+            if (dropdown.parentElement === document.body) {
+                document.body.removeChild(dropdown);
+                selectContainer.appendChild(dropdown);
+            }
+        });
+        
+        container.appendChild(fileDiv);
+    });
+}
+
+function initializeRangeSelector(selectId) {
+    const selectContainer = document.getElementById(selectId);
+    if (!selectContainer) return;
+    
+    // Проверяем, не инициализирован ли уже селектор
+    if (selectContainer.dataset.initialized === 'true') {
+        console.log(`✅ Range селектор ${selectId} уже инициализирован, пропускаем`);
+        return;
+    }
+    
+    const trigger = selectContainer.querySelector('.select-trigger');
+    const dropdown = selectContainer.querySelector('.select-dropdown');
+    const optionsContainer = dropdown.querySelector('.select-options');
+    
+    if (!trigger || !dropdown || !optionsContainer) {
+        console.error(`❌ Элементы range селектора ${selectId} не найдены`);
+        return;
+    }
+    
+    // Отмечаем как инициализированный
+    selectContainer.dataset.initialized = 'true';
+    console.log(`🎯 Инициализация range селектора ${selectId}...`);
+    
+    trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        
+        if (dropdown.classList.contains('active')) {
+            // Закрываем dropdown
+            dropdown.classList.remove('active');
+            trigger.classList.remove('active');
+            
+            // Удаляем из body если он там
+            if (dropdown.parentElement === document.body) {
+                document.body.removeChild(dropdown);
+                selectContainer.appendChild(dropdown);
+            }
+        } else {
+            // Открываем dropdown
+            trigger.classList.add('active');
+            
+            // Перемещаем dropdown в body для правильного позиционирования
+            document.body.appendChild(dropdown);
+            
+            // Позиционируем dropdown относительно trigger
+            const triggerRect = trigger.getBoundingClientRect();
+            dropdown.style.position = 'fixed';
+            dropdown.style.top = `${triggerRect.bottom + window.scrollY}px`;
+            dropdown.style.left = `${triggerRect.left + window.scrollX}px`;
+            dropdown.style.width = `${triggerRect.width}px`;
+            dropdown.style.zIndex = '10000';
+            
+            dropdown.classList.add('active');
+            
+            // Очищаем трекер рендеринга и загружаем список рейнджей
+            window.eventHandlersTracker.clearRenderTracker();
+            fetch('/api/ranges')
+                .then(response => response.json())
+                .then(data => {
+                    renderRangeSelectItems(data.items, optionsContainer, 0, selectContainer);
+                })
+                .catch(error => {
+                    console.error('Ошибка загрузки рейнджей:', error);
+                    optionsContainer.innerHTML = '<div style="padding: 10px; color: #ef4444;">Ошибка загрузки списка</div>';
+                });
+        }
+    });
+    
+    // Закрытие dropdown при клике вне его
+    document.addEventListener('click', (e) => {
+        if (dropdown && trigger && !dropdown.contains(e.target) && !trigger.contains(e.target)) {
+            dropdown.classList.remove('active');
+            trigger.classList.remove('active');
+            
+            // Возвращаем dropdown обратно в исходный контейнер
+            if (dropdown.parentElement === document.body) {
+                document.body.removeChild(dropdown);
+                selectContainer.appendChild(dropdown);
+            }
+        }
+    });
+}
+
+// Инициализация preflop selector с переносом dropdown в body
+function initializePreflopSelector() {
+    const selectContainer = document.querySelector('.preflop-selector .custom-select-container');
+    if (!selectContainer) {
+        console.error('❌ Префлоп селектор не найден');
+        return;
+    }
+    
+    // Проверяем, не инициализирован ли уже селектор
+    if (selectContainer.dataset.initialized === 'true') {
+        console.log('✅ Префлоп селектор уже инициализирован, пропускаем');
+        return;
+    }
+    
+    const trigger = selectContainer.querySelector('.select-trigger');
+    const dropdown = selectContainer.querySelector('.select-dropdown');
+    const optionsContainer = dropdown.querySelector('.select-options');
+    
+    if (!trigger || !dropdown || !optionsContainer) {
+        console.error('❌ Элементы префлоп селектора не найдены', { trigger: !!trigger, dropdown: !!dropdown, optionsContainer: !!optionsContainer });
+        return;
+    }
+    
+    // Отмечаем как инициализированный
+    selectContainer.dataset.initialized = 'true';
+    console.log('🎯 Инициализация префлоп селектора...');
+    
+    trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        
+        if (dropdown.classList.contains('active')) {
+            // Закрываем dropdown
+            dropdown.classList.remove('active');
+            trigger.classList.remove('active');
+            
+            // Удаляем из body если он там
+            if (dropdown.parentElement === document.body) {
+                document.body.removeChild(dropdown);
+                selectContainer.appendChild(dropdown);
+            }
+        } else {
+            // Открываем dropdown
+            trigger.classList.add('active');
+            
+            // Перемещаем dropdown в body для правильного позиционирования
+            document.body.appendChild(dropdown);
+            
+            // Позиционируем dropdown относительно trigger
+            const triggerRect = trigger.getBoundingClientRect();
+            dropdown.style.position = 'fixed';
+            dropdown.style.top = `${triggerRect.bottom + window.scrollY}px`;
+            dropdown.style.left = `${triggerRect.left + window.scrollX}px`;
+            dropdown.style.width = `${triggerRect.width}px`;
+            dropdown.style.zIndex = '10000';
+            
+            dropdown.classList.add('active');
+            
+            // Очищаем трекер рендеринга и загружаем список spot'ов
+            window.eventHandlersTracker.clearRenderTracker();
+            fetch('/api/preflopspots')
+                .then(response => response.json())
+                .then(data => {
+                    renderPreflopSpotItems(data.items, optionsContainer, 0, selectContainer);
+                })
+                .catch(error => {
+                    console.error('Ошибка загрузки preflop spots:', error);
+                    optionsContainer.innerHTML = '<div style="padding: 10px; color: #ef4444;">Ошибка загрузки списка</div>';
+                });
+        }
+    });
+    
+    // Закрытие dropdown при клике вне его
+    document.addEventListener('click', (e) => {
+        if (dropdown && trigger && !dropdown.contains(e.target) && !trigger.contains(e.target)) {
+            dropdown.classList.remove('active');
+            trigger.classList.remove('active');
+            
+            // Возвращаем dropdown обратно в исходный контейнер
+            if (dropdown.parentElement === document.body) {
+                document.body.removeChild(dropdown);
+                selectContainer.appendChild(dropdown);
+            }
+        }
+    });
+}
+
+
+
+async function loadPreflopSpotsList() {
+  try {
+    console.log('🔄 Загружаю список префлоп спотов...');
+    const response = await fetch('/api/preflopspots');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('📊 Данные префлоп спотов:', data);
+    
+    const container = document.querySelector('#preflop-spot-select .select-options');
+    console.log('📋 Контейнер опций найден:', !!container);
+    
+    if (container) {
+      // Очистить существующие элементы
+      container.innerHTML = '';
+      
+      // Добавить элементы из структуры папок
+      if (data.items && data.items.length > 0) {
+        renderPreflopSpotItems(data.items, container);
+        console.log(`✅ Загружено ${data.items.length} элементов префлоп спотов`);
+      } else {
+        console.log('⚠️ Нет элементов префлоп спотов для загрузки');
+      }
+    } else {
+      console.error('❌ Контейнер .select-options не найден');
+    }
+  } catch (error) {
+    console.error('❌ Ошибка загрузки списка префлоп спотов:', error);
+  }
+}
+
+function renderRangeItems(items, container, level = 0) {
+  items.forEach(item => {
+    if (item.type === 'folder') {
+      // Создаем заголовок папки
+      const folderHeader = document.createElement('div');
+      folderHeader.className = 'range-folder-header';
+      folderHeader.style.paddingLeft = `${level * 20}px`;
+      folderHeader.setAttribute('data-folder-path', item.path);
+      folderHeader.innerHTML = `
+        <span class="folder-toggle">▶</span>
+        <span class="folder-name">${item.name}</span>
+      `;
+      
+      // Создаем контейнер для содержимого папки
+      const folderContent = document.createElement('div');
+      folderContent.className = 'folder-content';
+      folderContent.style.display = 'none'; // Изначально скрыто
+      folderContent.setAttribute('data-folder-content', item.path);
+      
+      // Добавляем обработчик клика для сворачивания/разворачивания
+      folderHeader.onclick = () => toggleFolder(item.path);
+      
+      container.appendChild(folderHeader);
+      container.appendChild(folderContent);
+      
+      // Рекурсивно добавляем содержимое папки в ее контейнер
+      renderRangeItems(item.children, folderContent, level + 1);
+    } else if (item.type === 'file') {
+      // Создаем элемент файла
+      const fileItem = document.createElement('div');
+      fileItem.className = 'range-preset-item';
+      fileItem.style.paddingLeft = `${level * 20 + 20}px`;
+      fileItem.onclick = () => loadRangePreset(item.path);
+      fileItem.innerHTML = `
+        <span class="file-icon">📄</span>
+        <span class="file-name">${item.name}</span>
+      `;
+      container.appendChild(fileItem);
+    }
+  });
+}
+
+function toggleFolder(folderPath) {
+  const folderContent = document.querySelector(`[data-folder-content="${folderPath}"]`);
+  const folderHeader = document.querySelector(`[data-folder-path="${folderPath}"]`);
+  const toggle = folderHeader.querySelector('.folder-toggle');
+  
+  if (folderContent) {
+    const isVisible = folderContent.style.display !== 'none';
+    folderContent.style.display = isVisible ? 'none' : 'block';
+    toggle.textContent = isVisible ? '▶' : '▼';
+  }
+}
+
+async function loadRangesList() {
+  try {
+    console.log('🔄 Загружаю список рейнджей...');
+    const response = await fetch('/api/ranges');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('📊 Данные рейнджей:', data);
+    
+    const container = document.querySelector('.range-presets-list');
+    console.log('📋 Контейнер рейнджей найден:', !!container);
+    
+    if (container) {
+      // Очистить существующие элементы
+      container.innerHTML = '';
+      
+      // Добавить элементы из структуры папок
+      if (data.items && data.items.length > 0) {
+        renderRangeItems(data.items, container);
+        console.log(`✅ Загружено ${data.items.length} элементов рейнджей`);
+      } else {
+        console.log('⚠️ Нет элементов рейнджей для загрузки');
+      }
+    } else {
+      console.error('❌ Контейнер .range-presets-list не найден');
+    }
+  } catch (error) {
+    console.error('❌ Ошибка загрузки списка рейнджей:', error);
+  }
 }
 
 // Автоматический тест при загрузке (только для разработки)

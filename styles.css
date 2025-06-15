@@ -999,6 +999,7 @@ body {
   align-items: center;
   gap: 15px;
   width: 100%;
+  overflow: visible; /* Убеждаемся, что дочерние элементы не обрезаются */
 }
 
 /* Контейнер для общих карт - центрирован */
@@ -1066,6 +1067,8 @@ body {
   border-radius: 10px;
   border: 1px solid rgba(59, 130, 246, 0.3);
   min-width: 100px;
+  position: relative; /* Добавляем для позиционирования контейнеров действий */
+  overflow: visible; /* Убеждаемся, что дочерние элементы не обрезаются */
 }
 
 .opponent-bet-display {
@@ -1130,6 +1133,66 @@ body {
   color: #60a5fa;
   margin-top: 4px;
   font-weight: 500;
+}
+
+/* Контейнеры для записи действий игроков */
+.opponent-actions-display,
+.hero-actions-display {
+  position: absolute;
+  right: -120px; /* Размещаем справа от контейнера ставок */
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 100px;
+  max-width: 150px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-family: 'Courier New', monospace; /* Моноширинный шрифт для лучшей читаемости */
+  line-height: 1.2;
+  z-index: 15; /* Увеличиваем z-index для видимости */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  border: 1px solid rgba(255, 255, 255, 0.3); /* Тонкая светлая рамка */
+}
+
+.opponent-actions-display {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #dc2626;
+}
+
+.hero-actions-display {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  color: #16a34a;
+}
+
+.actions-text {
+  font-weight: 500;
+  font-size: 0.7rem;
+  white-space: pre-wrap; /* Сохраняем переносы строк */
+}
+
+/* Адаптивные стили для контейнеров действий */
+@media (max-width: 1200px) {
+  .opponent-actions-display,
+  .hero-actions-display {
+    right: -100px;
+    min-width: 80px;
+    max-width: 120px;
+    font-size: 0.7rem;
+  }
+  
+  .actions-text {
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .opponent-actions-display,
+  .hero-actions-display {
+    display: none; /* Скрываем на мобильных устройствах */
+  }
 }
 
 /* Область героя с кнопками действий */
@@ -1222,6 +1285,9 @@ body {
   display: flex;
   gap: 8px;
   justify-content: center;
+  align-items: center;
+  width: 100%;
+  position: relative; /* Для точного центрирования */
 }
 
 /* ===== СТИЛИ КАРТ С ЦВЕТНЫМИ ФОНАМИ ПО МАСТЯМ ===== */
@@ -1979,99 +2045,87 @@ body {
   flex-wrap: wrap;
 }
 
-/* Мобильные стили для центрального героя */
+/* Центрированная строка героя - ИСПРАВЛЕНО ДЛЯ ВСЕХ МАСШТАБОВ */
 .hero-center-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px; /* Уменьшаем gap */
-  margin-top: 15px;
-  min-width: 400px; /* Минимальная ширина для горизонтального размещения кнопок */
-  width: 100%; /* Позволяем растягиваться по ширине родителя */
-  max-width: 600px; /* УМЕНЬШАЕМ max-width на 200px: 800px -> 600px */
-  margin-left: 510px; /* СМЕЩАЕМ ВПРАВО НА 100px: 410px + 100px = 510px */
-  margin-right: 20px; /* Добавляем отступ справа */
-  
-  /* ОТЛАДОЧНЫЕ ГРАНИЦЫ - для визуализации контейнера */
-  border: 3px solid #ff0000 !important; /* КРАСНАЯ граница для .hero-center-row */
-  background: rgba(255, 0, 0, 0.1) !important; /* Легкий красный фон */
+  justify-content: space-between; /* Распределяем пространство между элементами */
+  gap: 15px;
+  margin: 15px auto 0 auto; /* Центрируем контейнер по горизонтали */
+  width: 100%;
+  max-width: 800px; /* Максимальная ширина для больших экранов */
+  position: relative; /* Для абсолютного позиционирования карт */
+  left: 0; /* Убираем смещение */
+  right: 0; /* Убираем смещение */
+  min-height: 80px; /* Минимальная высота для размещения карт */
 }
 
 .hero-info-left {
-  flex: 2; /* ИЗМЕНЯЕМ: увеличиваем с 1 до 2 для балансировки */
-  text-align: center; /* Центрируем текст */
-  min-width: 80px; /* УВЕЛИЧИВАЕМ минимальную ширину */
-  
-  /* ОТЛАДОЧНЫЕ ГРАНИЦЫ */
-  border: 2px solid #00ff00 !important; /* ЗЕЛЕНАЯ граница для .hero-info-left */
-  background: rgba(0, 255, 0, 0.1) !important;
-}
-
-.hero-cards-center {
-  flex: 3; /* УВЕЛИЧИВАЕМ flex с 2 до 3 для большего пространства по центру */
+  flex: 0 0 220px; /* Фиксированная ширина, такая же как у opponent-area */
+  text-align: center;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-width: 120px; /* УВЕЛИЧИВАЕМ минимальную ширину для карт */
-  
-  /* ОТЛАДОЧНЫЕ ГРАНИЦЫ */
-  border: 2px solid #0000ff !important; /* СИНЯЯ граница для .hero-cards-center */
-  background: rgba(0, 0, 255, 0.1) !important;
+}
+
+.hero-cards-center {
+  flex: 0 0 auto; /* Не растягиваем, фиксированный размер */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 120px;
+  position: absolute; /* Абсолютное позиционирование для точного центрирования */
+  left: 50%;
+  transform: translateX(-50%); /* Центрируем относительно родителя */
+  z-index: 10; /* Поверх других элементов */
 }
 
 .actions-right {
-  flex: 2; /* СИЛЬНО УМЕНЬШАЕМ flex с 4 до 2 для центрирования синего контейнера */
+  flex: 0 0 220px; /* Фиксированная ширина для симметрии */
   display: flex;
-  justify-content: flex-start; /* Выравниваем кнопки к левому краю контейнера */
-  
-  /* ОТЛАДОЧНЫЕ ГРАНИЦЫ */
-  border: 3px solid #ff00ff !important; /* МАГЕНТА граница для .actions-right */
-  background: rgba(255, 0, 255, 0.1) !important;
+  justify-content: center; /* Центрируем кнопки */
+  align-items: center;
 }
 
 .actions-right .table-actions {
-  width: 500%; /* УВЕЛИЧИВАЕМ ширину еще больше для смещения в угол */
-  min-width: 500px; /* УМЕНЬШАЕМ min-width на 200px: 700px -> 500px */
+  width: auto; /* Автоматическая ширина */
+  min-width: 300px; /* Разумная минимальная ширина */
+  max-width: 400px; /* Максимальная ширина для контроля */
   display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-start; /* Выравниваем кнопки к левому краю */
+  flex-direction: column !important; /* Вертикальное расположение */
+  flex-wrap: nowrap;
+  gap: 6px;
+  justify-content: center; /* Центрируем содержимое */
   align-items: center;
   padding: 8px;
   background: rgba(74, 222, 128, 0.05);
   border-radius: 6px;
   border: 1px solid rgba(74, 222, 128, 0.2);
-  
-  /* ОТЛАДОЧНЫЕ ГРАНИЦЫ */
-  border: 3px solid #ffff00 !important; /* ЖЕЛТАЯ граница для .table-actions */
-  background: rgba(255, 255, 0, 0.2) !important;
 }
 
-/* ===== ФИНАЛЬНЫЕ ПРИНУДИТЕЛЬНЫЕ ПРАВИЛА ДЛЯ ГОРИЗОНТАЛЬНОГО РАСПОЛОЖЕНИЯ КНОПОК ===== */
-/* Эти правила должны переопределить все остальные конфликтующие стили */
+/* ===== СТИЛИ ДЛЯ ПАНЕЛИ ДЕЙСТВИЙ ===== */
 .table-actions,
 .hero-actions-row .table-actions,
-.hero-with-actions .table-actions,
-.actions-right .table-actions {
+.hero-with-actions .table-actions {
   display: flex !important;
-  flex-direction: column !important; /* ИЗМЕНЯЕМ: делаем колонкой для размещения кнопок сайзинга сверху */
-  gap: 5px !important; /* УМЕНЬШАЕМ gap между рядами */
-  justify-content: flex-start !important; /* ОБНОВЛЯЕМ выравнивание к левому краю */
-  align-items: flex-start !important; /* ИЗМЕНЯЕМ: выравниваем элементы влево */
-  width: 500% !important; /* ОБНОВЛЯЕМ ширину до 500% */
-  min-width: 500px !important; /* УМЕНЬШАЕМ min-width на 200px: 700px -> 500px */
+  flex-direction: column !important;
+  gap: 6px !important;
+  justify-content: center !important;
+  align-items: center !important;
+  width: auto !important;
+  min-width: 300px !important;
+  max-width: 400px !important;
 }
 
 /* Контейнер для кнопок сайзинга */
 .sizing-buttons {
   display: flex !important;
   flex-direction: row !important;
-  gap: 0px !important; /* Убираем промежутки между кнопками сайзинга */
-  justify-content: flex-start !important; /* ИЗМЕНЯЕМ: выравниваем влево */
+  gap: 2px !important;
+  justify-content: center !important; /* Центрируем кнопки сайзинга */
   align-items: center !important;
   width: 100% !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important; /* Позволяем перенос на новую строку */
 }
 
 /* Кнопки сайзинга */
@@ -2145,11 +2199,11 @@ body {
 .main-actions {
   display: flex !important;
   flex-direction: row !important;
-  gap: 0px !important; /* УБИРАЕМ промежутки между основными кнопками */
-  justify-content: flex-start !important; /* ИЗМЕНЯЕМ: выравниваем влево */
+  gap: 4px !important;
+  justify-content: center !important; /* Центрируем основные кнопки */
   align-items: center !important;
   width: 100% !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important; /* Позволяем перенос на новую строку */
 }
 
 /* Кнопки внутри горизонтального контейнера */
@@ -2157,11 +2211,11 @@ body {
 .hero-center-row .actions-right .table-actions .action-btn,
 .hero-area .actions-right .table-actions .action-btn,
 .poker-table .actions-right .table-actions .action-btn {
-  width: 150px !important;
-  height: 80px !important;
-  padding: 8px 12px !important;
-  font-size: 0.75rem !important;
-  border-radius: 6px !important;
+  width: 80px !important;
+  height: 35px !important;
+  padding: 6px 8px !important;
+  font-size: 0.7rem !important;
+  border-radius: 4px !important;
   font-weight: 600 !important;
   transition: all 0.3s ease !important;
   border: none !important;
@@ -2172,8 +2226,95 @@ body {
   text-align: center !important;
   line-height: 1.2 !important;
   writing-mode: horizontal-tb !important;
-  flex: 0 0 auto !important; /* Не растягиваем кнопки */
-  margin: 0 !important; /* УБИРАЕМ любые отступы */
+  flex: 0 0 auto !important;
+  margin: 0 !important;
+}
+
+/* ===== АДАПТИВНЫЕ СТИЛИ ДЛЯ ЦЕНТРИРОВАНИЯ ===== */
+
+/* Средние экраны */
+@media (max-width: 1200px) {
+  .hero-center-row {
+    max-width: 700px;
+    gap: 12px;
+  }
+  
+  .actions-right .table-actions {
+    min-width: 250px;
+    max-width: 350px;
+  }
+  
+  .actions-right .table-actions .action-btn {
+    width: 70px !important;
+    height: 32px !important;
+    font-size: 0.65rem !important;
+  }
+}
+
+/* Планшеты */
+@media (max-width: 768px) {
+  .hero-center-row {
+    max-width: 600px;
+    gap: 10px;
+    flex-direction: column; /* Вертикальное расположение на планшетах */
+    min-height: auto; /* Убираем минимальную высоту на планшетах */
+  }
+  
+  .hero-info-left,
+  .actions-right {
+    width: 100%;
+    flex: none;
+  }
+  
+  .hero-cards-center {
+    position: relative; /* Возвращаем обычное позиционирование на планшетах */
+    left: auto;
+    transform: none;
+    width: 100%;
+  }
+  
+  .actions-right .table-actions {
+    min-width: 200px;
+    max-width: 300px;
+  }
+  
+  .actions-right .table-actions .action-btn {
+    width: 60px !important;
+    height: 30px !important;
+    font-size: 0.6rem !important;
+  }
+}
+
+/* Мобильные устройства */
+@media (max-width: 480px) {
+  .hero-center-row {
+    max-width: 100%;
+    gap: 8px;
+    margin: 10px auto 0 auto;
+  }
+  
+  .actions-right .table-actions {
+    min-width: 180px;
+    max-width: 250px;
+  }
+  
+  .actions-right .table-actions .action-btn {
+    width: 50px !important;
+    height: 28px !important;
+    font-size: 0.55rem !important;
+  }
+  
+  .sizing-btn {
+    width: 30px !important;
+    height: 22px !important;
+    font-size: 0.6rem !important;
+  }
+  
+  .sizing-input {
+    width: 50px !important;
+    height: 22px !important;
+    font-size: 0.6rem !important;
+  }
 }
 
 /* ===== АНИМАЦИИ СМЕНЫ УЛИЦ И ЗАВЕРШЕНИЯ РАЗДАЧ ===== */
@@ -2296,5 +2437,335 @@ body {
   margin-top: 15px;
   padding: 10px 25px;
   font-weight: 600;
+}
+
+/* ===== ПРЕФЛОП СПОТ СЕЛЕКТОР ===== */
+.preflop-selector {
+  margin-bottom: 15px;
+}
+
+.range-selector {
+  display: inline-block;
+  min-width: 200px;
+}
+
+.custom-select-container {
+  position: relative;
+  width: 100%;
+  z-index: 100;
+}
+
+.custom-select {
+  position: relative;
+  width: 100%;
+}
+
+.select-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.select-trigger:hover {
+  border-color: var(--accent-primary);
+}
+
+.select-trigger.active {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
+}
+
+.select-text {
+  flex-grow: 1;
+}
+
+.select-arrow {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+}
+
+.select-trigger.active .select-arrow {
+  transform: rotate(180deg);
+}
+
+.select-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
+  border-top: none;
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  display: none;
+  z-index: 9999;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.select-dropdown.active {
+  display: block;
+  z-index: 10000;
+}
+
+.select-options {
+  padding: 4px;
+}
+
+.preflop-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.preflop-folder-header:hover {
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.preflop-folder-toggle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  min-width: 12px;
+  transition: transform 0.2s ease;
+}
+
+.preflop-folder-name {
+  font-weight: 500;
+}
+
+.preflop-folder-content {
+  margin-left: 16px;
+  border-left: 1px solid rgba(148, 163, 184, 0.2);
+  padding-left: 8px;
+}
+
+.preflop-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.9rem;
+}
+
+.preflop-file-item:hover {
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.preflop-file-icon {
+  font-size: 0.8rem;
+  opacity: 0.6;
+  color: var(--text-secondary);
+  min-width: 14px;
+}
+
+.preflop-file-name {
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+.preflop-preview {
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--bg-primary);
+  border-radius: var(--border-radius);
+  font-family: monospace;
+  font-size: 0.85rem;
+  max-height: 100px;
+  overflow-y: auto;
+  border: 1px solid var(--border-primary);
+  display: none;
+}
+
+.preflop-preview.show {
+  display: block;
+}
+
+/* ===== КНОПКИ РЕЙНДЖЕЙ ===== */
+.range-preset-btn {
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--border-radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.range-preset-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-secondary);
+  color: var(--accent-secondary);
+}
+
+/* ===== МОДАЛЬНОЕ ОКНО РЕЙНДЖЕЙ ===== */
+.range-presets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.range-presets-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.range-presets-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.range-presets-list::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 3px;
+}
+
+.range-presets-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* Заголовки папок */
+.range-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  margin-top: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.range-folder-header:first-child {
+  margin-top: 0;
+}
+
+.range-folder-header:hover {
+  background: rgba(74, 222, 128, 0.08);
+  transform: translateX(2px);
+}
+
+.folder-toggle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  min-width: 12px;
+  transition: transform 0.2s ease;
+}
+
+.folder-name {
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.folder-content {
+  margin-left: 16px;
+  border-left: 1px solid rgba(148, 163, 184, 0.2);
+  padding-left: 8px;
+}
+
+/* Элементы файлов */
+.range-preset-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.range-preset-item:hover {
+  background: rgba(74, 222, 128, 0.08);
+  transform: translateX(4px);
+}
+
+.range-preset-item:active {
+  transform: translateX(2px);
+  background: rgba(74, 222, 128, 0.12);
+}
+
+.file-icon {
+  font-size: 0.8rem;
+  opacity: 0.6;
+  color: var(--text-secondary);
+  min-width: 14px;
+}
+
+.file-name {
+  font-weight: 400;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* Современное модальное окно */
+.modal {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.modal-content {
+  background: var(--bg-primary);
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--border-primary);
+  max-width: 400px;
+  max-height: 70vh;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-primary);
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.05), rgba(74, 222, 128, 0.02));
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-header h3::before {
+  content: "";
+}
+
+.modal-body {
+  padding: 0;
 }
 

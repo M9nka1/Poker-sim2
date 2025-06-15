@@ -4,10 +4,12 @@
   "description": "Multiplayer poker simulator with WebSocket support for Railway deployment",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "node server-with-auth.js",
+    "dev": "nodemon server-with-auth.js",
     "build": "echo 'No build step required'",
-    "deploy": "echo 'Deploying to Railway'"
+    "deploy": "echo 'Deploying to Railway'",
+    "init-db": "node scripts/init-database.js",
+    "create-admin": "node scripts/create-admin.js"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -20,7 +22,16 @@
     "compression": "^1.7.4",
     "uuid": "^9.0.1",
     "moment": "^2.29.4",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "express-rate-limit": "^7.1.5",
+    "sqlite3": "^5.1.6",
+    "express-validator": "^7.0.1",
+    "cookie-parser": "^1.4.6",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "archiver": "^6.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
@@ -32,7 +43,9 @@
     "simulator",
     "railway",
     "holdem-manager",
-    "hand2note"
+    "hand2note",
+    "authentication",
+    "authorization"
   ],
   "author": "Poker Simulator Team",
   "license": "MIT",
