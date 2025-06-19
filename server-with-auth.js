@@ -2469,16 +2469,21 @@ class PokerTable {
       }
     }
     
-    // Используем Hand.winners для определения победителя
-    const handsOnly = playerHands.map(ph => ph.hand);
-    const winningHands = Hand.winners(handsOnly);
+    // Сортируем руки по силе (лучшая рука первая)
+    playerHands.sort((a, b) => {
+      // Сравниваем ранги рук (чем больше ранг, тем лучше рука)
+      if (a.hand.rank !== b.hand.rank) {
+        return b.hand.rank - a.hand.rank;
+      }
+      // Если ранги равны, сравниваем по качеству карт
+      return Hand.winners([a.hand, b.hand])[0] === a.hand ? -1 : 1;
+    });
     
-    console.log(`🏆 Найдено ${winningHands.length} выигрышных рук`);
+    console.log(`🏆 Найден победитель после сортировки`);
     
-    // Найти игрока с выигрышной рукой
-    const winnerIndex = handsOnly.findIndex(hand => winningHands.includes(hand));
-    const winner = playerHands[winnerIndex].player;
-    const winnerHand = playerHands[winnerIndex].hand;
+    // Первая рука в отсортированном списке - победитель
+    const winner = playerHands[0].player;
+    const winnerHand = playerHands[0].hand;
     
     console.log(`🏆 ПОБЕДИТЕЛЬ: ${winner.name} с комбинацией ${winnerHand.descr}`);
     

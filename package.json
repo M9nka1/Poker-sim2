@@ -31,6 +31,7 @@
     "passport-google-oauth20": "^2.0.0",
     "pokersolver": "^2.1.4",
     "socket.io": "^4.7.4",
+    "socket.io-client": "^4.8.1",
     "sqlite3": "^5.1.6",
     "uuid": "^9.0.1"
   },
