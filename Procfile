@@ -1,1 +1,1 @@
-web: node server.js 
+web: node server-with-auth.js 
