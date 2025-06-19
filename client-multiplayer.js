@@ -21,7 +21,16 @@ class MultiplayerClient {
   initializeSocket() {
     console.log('🔌 Инициализация соединения...');
     
-    this.socket = io();
+    // Получаем токен аутентификации
+    const token = this.getAuthToken();
+    
+    // Инициализация Socket.IO с токеном аутентификации
+    this.socket = io({
+      auth: {
+        token: token
+      },
+      transports: ['websocket', 'polling']
+    });
     
     // Добавить глобальное логирование всех событий для отладки
     this.socket.onAny((eventName, data) => {
@@ -87,6 +96,32 @@ class MultiplayerClient {
   showConnectionStatus() {
     // Убираем индикатор подключения - он не нужен
     console.log('Connection status initialized');
+  }
+
+  // Получить токен аутентификации из localStorage
+  getAuthToken() {
+    // Сначала пробуем найти токен с sessionId
+    const sessionId = this.getSessionId();
+    if (sessionId) {
+      const tokenWithSession = localStorage.getItem(`auth_token_${sessionId}`);
+      if (tokenWithSession) {
+        return tokenWithSession;
+      }
+    }
+    
+    // Fallback на старый формат
+    const fallbackToken = localStorage.getItem('accessToken');
+    return fallbackToken || null;
+  }
+
+  // Получить sessionId из localStorage или сгенерировать новый
+  getSessionId() {
+    let sessionId = localStorage.getItem('sessionId');
+    if (!sessionId) {
+      sessionId = 'tab_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+      localStorage.setItem('sessionId', sessionId);
+    }
+    return sessionId;
   }
 
   updateConnectionStatus(connected) {
@@ -3337,7 +3372,7 @@ function exportAllTables() {
 
 function openHandHistoryManager() {
   // Открыть страницу управления файлами HandHistory в новой вкладке
-  window.open('/handhistory-manager.html', '_blank');
+  window.open('/handhistory-manager-auth.html', '_blank');
 }
 
 // Функции управления перетаскиванием элементов

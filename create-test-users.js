@@ -1,10 +1,11 @@
 const bcrypt = require('bcrypt');
-const Database = require('./database/database');
-
-const database = new Database('./poker_simulator.db');
+const database = require('./database/database');
 
 async function createTestUsers() {
   try {
+    // Инициализируем базу данных
+    await database.init();
+    
     console.log('🔐 Создание тестовых пользователей...');
     
     // Список тестовых пользователей
@@ -13,7 +14,8 @@ async function createTestUsers() {
       { email: 'player2@test.com', password: 'Password123!', handLimit: 100 },
       { email: 'player3@test.com', password: 'Password123!', handLimit: 50 },
       { email: 'player4@test.com', password: 'Password123!', handLimit: 50 },
-      { email: 'tester@gmail.com', password: 'Password123!', handLimit: 200 }
+      { email: 'tester@gmail.com', password: 'Password123!', handLimit: 200 },
+      { email: 'demo@test.com', password: 'demo123', handLimit: 1000 }
     ];
     
     for (const userData of testUsers) {
@@ -67,6 +69,7 @@ async function createTestUsers() {
   } catch (error) {
     console.error('❌ Критическая ошибка:', error);
   } finally {
+    await database.close();
     process.exit(0);
   }
 }

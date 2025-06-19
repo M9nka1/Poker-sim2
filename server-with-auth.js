@@ -3160,14 +3160,63 @@ class PokerTable {
   }
 }
 
+// Socket.IO middleware для аутентификации
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      console.log(`🔓 Неаутентифицированное подключение: ${socket.id}`);
+      socket.userId = null;
+      socket.userEmail = null;
+      socket.isAuthenticated = false;
+      return next();
+    }
+
+    // Проверяем токен
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await database.get('SELECT * FROM Users WHERE user_id = ?', [decoded.userId]);
+    
+    if (!user) {
+      console.log(`❌ Пользователь не найден для токена: ${socket.id}`);
+      socket.userId = null;
+      socket.userEmail = null;
+      socket.isAuthenticated = false;
+      return next();
+    }
+
+    // Получаем роли пользователя
+    const userRoles = await database.all(`
+      SELECT r.role_name 
+      FROM UserRoles ur 
+      JOIN Roles r ON ur.role_id = r.role_id 
+      WHERE ur.user_id = ?
+    `, [user.user_id]);
+
+    socket.userId = user.user_id;
+    socket.userEmail = user.email;
+    socket.userRoles = userRoles.map(r => r.role_name);
+    socket.isAuthenticated = true;
+    
+    console.log(`🔐 Аутентифицированное подключение: ${socket.id} (${user.email})`);
+    next();
+  } catch (error) {
+    console.error('❌ Ошибка аутентификации WebSocket:', error);
+    socket.userId = null;
+    socket.userEmail = null;
+    socket.isAuthenticated = false;
+    next();
+  }
+});
+
 // Socket.IO логика
 io.on('connection', (socket) => {
-  console.log(`Новое подключение: ${socket.id}`);
+  console.log(`Новое подключение: ${socket.id} ${socket.isAuthenticated ? `(${socket.userEmail})` : '(неаутентифицирован)'}`);
 
   // Создание сессии
-  socket.on('create-session', (data) => {
+  socket.on('create-session', async (data) => {
     const sessionId = uuidv4().substring(0, 8).toUpperCase();
-    const userId = data.userId || uuidv4();
+    const userId = socket.isAuthenticated ? socket.userId : (data.userId || uuidv4());
     
     // Если preflopSpot пустой, загружаем пример
     if (!data.settings.preflopSpot || data.settings.preflopSpot.trim() === '') {
@@ -3183,9 +3232,19 @@ io.on('connection', (socket) => {
     
     const session = new PokerSession(sessionId, userId, data.settings);
     session.addPlayer(userId, {
-      name: data.playerName || 'Player 1',
+      name: data.playerName || (socket.isAuthenticated ? socket.userEmail.split('@')[0] : 'Player 1'),
       socketId: socket.id
     });
+
+    // Создаем запись в базе данных для аутентифицированных пользователей
+    if (socket.isAuthenticated) {
+      try {
+        await database.createUserSession(socket.userId, sessionId);
+        console.log(`📝 Сессия ${sessionId} записана в БД для пользователя ${socket.userEmail}`);
+      } catch (error) {
+        console.error('❌ Ошибка записи сессии в БД:', error);
+      }
+    }
 
     activeSessions.set(sessionId, session);
     activeUsers.set(socket.id, { userId, sessionId });
@@ -3198,7 +3257,7 @@ io.on('connection', (socket) => {
       sessionInfo: session.getSessionInfo(userId)
     });
     
-    console.log(`Сессия ${sessionId} создана, ожидание второго игрока...`);
+    console.log(`Сессия ${sessionId} создана ${socket.isAuthenticated ? `пользователем ${socket.userEmail}` : 'анонимно'}, ожидание второго игрока...`);
   });
 
   // Присоединение к сессии
@@ -3437,8 +3496,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', () => {
-    console.log(`Отключение: ${socket.id}`);
+  socket.on('disconnect', async () => {
+    console.log(`Отключение: ${socket.id} ${socket.isAuthenticated ? `(${socket.userEmail})` : '(неаутентифицирован)'}`);
     
     const userData = activeUsers.get(socket.id);
     if (userData) {
@@ -3448,6 +3507,17 @@ io.on('connection', (socket) => {
         
         // Если создатель отключился или сессия пуста, удаляем сессию
         if (userData.userId === session.creatorId || session.players.size === 0) {
+          // Завершаем сессию в базе данных для аутентифицированных пользователей
+          if (socket.isAuthenticated) {
+            try {
+              const handsPlayed = session.handHistories.get(1)?.hands.length || 0;
+              await database.endUserSession(userData.sessionId, handsPlayed);
+              console.log(`📝 Сессия ${userData.sessionId} завершена в БД для пользователя ${socket.userEmail}`);
+            } catch (error) {
+              console.error('❌ Ошибка завершения сессии в БД:', error);
+            }
+          }
+          
           activeSessions.delete(userData.sessionId);
           console.log(`Сессия ${userData.sessionId} удалена`);
         } else {
@@ -3592,18 +3662,23 @@ app.get('/api/handhistory', authenticateToken, async (req, res) => {
           created: stats.birthtime,
           modified: stats.mtime,
           downloadUrl: `/api/handhistory/download/${file}`,
-          userId: null // Будем определять по сессии или из базы данных
+          userId: null // Будем определять по сессии из базы данных
         };
       })
       .sort((a, b) => b.modified - a.modified);
 
     // Если пользователь не админ, фильтруем только его файлы
     if (!isAdmin) {
-      // Здесь можно добавить логику связи файлов с пользователями
-      // Пока показываем все файлы для пользователей (можно ограничить позже)
-      console.log(`👤 Пользователь ${req.user.email} запросил свои HandHistory файлы`);
+      // Получаем все сессии пользователя из базы данных
+      const userSessions = await database.getUserSessions(req.user.userId);
+      const userSessionIds = userSessions.map(session => session.session_id);
+      
+      // Фильтруем файлы по сессиям пользователя
+      files = files.filter(file => userSessionIds.includes(file.sessionId));
+      
+      console.log(`👤 Пользователь ${req.user.email} запросил свои HandHistory файлы: найдено ${files.length} файлов из ${userSessionIds.length} сессий`);
     } else {
-      console.log(`👑 Администратор ${req.user.email} запросил все HandHistory файлы`);
+      console.log(`👑 Администратор ${req.user.email} запросил все HandHistory файлы: найдено ${files.length} файлов`);
     }
     
     // Подсчитываем количество рук в каждом файле (для первых 10 файлов для производительности)

@@ -36,6 +36,16 @@ CREATE TABLE IF NOT EXISTS Hands (
     FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
 );
 
+-- Таблица игровых сессий пользователей
+CREATE TABLE IF NOT EXISTS UserSessions (
+    session_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at DATETIME,
+    hands_played INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
+);
+
 -- Таблица refresh токенов
 CREATE TABLE IF NOT EXISTS RefreshTokens (
     token_id TEXT PRIMARY KEY DEFAULT (hex(randomblob(16))),
@@ -51,6 +61,8 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON Users(email);
 CREATE INDEX IF NOT EXISTS idx_users_google_id ON Users(google_id);
 CREATE INDEX IF NOT EXISTS idx_hands_user_id ON Hands(user_id);
 CREATE INDEX IF NOT EXISTS idx_hands_played_at ON Hands(played_at);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON UserSessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_created_at ON UserSessions(created_at);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON RefreshTokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON RefreshTokens(expires_at);
 
