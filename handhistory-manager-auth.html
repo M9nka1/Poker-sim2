@@ -613,6 +613,20 @@
         let filteredFiles = [];
         let userInfo = {};
         let isAdmin = false;
+        
+        // Функция для получения токена из localStorage
+        function getAuthToken() {
+            // Пробуем найти токен с sessionId (новый формат)
+            const keys = Object.keys(localStorage);
+            const tokenKey = keys.find(key => key.startsWith('auth_token_'));
+            
+            if (tokenKey) {
+                return localStorage.getItem(tokenKey);
+            }
+            
+            // Fallback на старый формат
+            return localStorage.getItem('accessToken');
+        }
 
         // Загрузка данных при запуске страницы
         document.addEventListener('DOMContentLoaded', () => {
@@ -627,7 +641,7 @@
 
         // Проверка аутентификации
         async function checkAuth() {
-            const token = localStorage.getItem('accessToken');
+            const token = getAuthToken();
             if (!token) {
                 window.location.href = '/';
                 return;
@@ -644,7 +658,13 @@
                     userInfo = await response.json();
                     updateUserInfo();
                 } else {
-                    localStorage.removeItem('accessToken');
+                    // Удаляем все токены аутентификации
+                    const keys = Object.keys(localStorage);
+                    keys.forEach(key => {
+                        if (key.startsWith('auth_token_') || key === 'accessToken') {
+                            localStorage.removeItem(key);
+                        }
+                    });
                     window.location.href = '/';
                 }
             } catch (error) {
@@ -691,7 +711,7 @@
             messageArea.innerHTML = '';
             
             try {
-                const token = localStorage.getItem('accessToken');
+                const token = getAuthToken();
                 const response = await fetch('/api/handhistory', {
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -727,7 +747,7 @@
         // Загрузка статистики
         async function loadStats() {
             try {
-                const token = localStorage.getItem('accessToken');
+                const token = getAuthToken();
                 const response = await fetch('/api/handhistory/stats', {
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -858,7 +878,7 @@
         // Скачивание файла
         async function downloadFile(filename) {
             try {
-                const token = localStorage.getItem('accessToken');
+                const token = getAuthToken();
                 const response = await fetch(`/api/handhistory/download/${filename}`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -890,7 +910,7 @@
         // Просмотр файла
         async function viewFile(filename) {
             try {
-                const token = localStorage.getItem('accessToken');
+                const token = getAuthToken();
                 window.open(`/api/handhistory/view/${filename}?token=${token}`, '_blank');
             } catch (error) {
                 console.error('Ошибка просмотра файла:', error);
@@ -910,7 +930,7 @@
             }
             
             try {
-                const token = localStorage.getItem('accessToken');
+                const token = getAuthToken();
                 const response = await fetch(`/api/handhistory/${filename}`, {
                     method: 'DELETE',
                     headers: {

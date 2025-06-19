@@ -299,11 +299,13 @@ class AuthManager {
         const sessionIcon = document.querySelector('.session-icon');
         const userIcon = document.querySelector('.user-icon');
         const logoutIcon = document.querySelector('.logout-icon');
+        const filesIcon = document.querySelector('.files-icon');
 
         if (settingsIcon) settingsIcon.style.display = 'block';
         if (sessionIcon) sessionIcon.style.display = 'block';
         if (userIcon) userIcon.style.display = 'block';
         if (logoutIcon) logoutIcon.style.display = 'block';
+        if (filesIcon) filesIcon.style.display = 'block';
 
         // Показываем админ-панель только для администраторов
         if (this.currentUser?.roles?.includes('admin')) {
@@ -871,4 +873,21 @@ document.addEventListener('DOMContentLoaded', () => {
 // Дополнительная проверка после полной загрузки
 window.addEventListener('load', () => {
     setTimeout(ensureSettingsAccess, 1000);
+});
+
+// Функция для открытия менеджера HandHistory
+function openHandHistoryManager() {
+    if (!window.authManager || !window.authManager.currentUser) {
+        alert('Необходимо войти в систему для доступа к файлам HandHistory');
+        return;
+    }
+    
+    // Открываем страницу управления HandHistory в новой вкладке
+    window.open('/handhistory-manager-auth.html', '_blank');
+}
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    window.authManager = new AuthManager();
+    window.adminManager = new AdminManager(window.authManager);
 }); 
