@@ -793,13 +793,23 @@
             const container = document.getElementById('filesContainer');
             
             if (filteredFiles.length === 0) {
-                container.innerHTML = `
-                    <div class="no-files">
+                const noFilesMessage = isAdmin ? 
+                    `<div class="no-files">
                         <h3>📭 Файлы не найдены</h3>
                         <p>Пока нет сохраненных файлов HandHistory или они не соответствуют критериям поиска.</p>
                         <p>Сыграйте несколько раздач в симуляторе для создания файлов.</p>
-                    </div>
-                `;
+                    </div>` :
+                    `<div class="no-files">
+                        <h3>🎮 Начните играть!</h3>
+                        <p>У вас пока нет файлов HandHistory.</p>
+                        <p>Перейдите в <a href="/" style="color: var(--accent-primary); text-decoration: none;">покерный симулятор</a> и сыграйте несколько раздач.</p>
+                        <p>После игры ваши HandHistory файлы появятся здесь автоматически.</p>
+                        <div style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border-left: 4px solid var(--accent-primary);">
+                            <strong>💡 Совет:</strong> Каждая игровая сессия создает отдельный файл с историей всех сыгранных раздач.
+                        </div>
+                    </div>`;
+                
+                container.innerHTML = noFilesMessage;
                 return;
             }
             

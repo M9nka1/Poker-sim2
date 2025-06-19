@@ -3673,10 +3673,16 @@ app.get('/api/handhistory', authenticateToken, async (req, res) => {
       const userSessions = await database.getUserSessions(req.user.userId);
       const userSessionIds = userSessions.map(session => session.session_id);
       
-      // Фильтруем файлы по сессиям пользователя
-      files = files.filter(file => userSessionIds.includes(file.sessionId));
-      
-      console.log(`👤 Пользователь ${req.user.email} запросил свои HandHistory файлы: найдено ${files.length} файлов из ${userSessionIds.length} сессий`);
+      // Если у пользователя есть записанные сессии, фильтруем по ним
+      if (userSessionIds.length > 0) {
+        files = files.filter(file => userSessionIds.includes(file.sessionId));
+        console.log(`👤 Пользователь ${req.user.email} запросил свои HandHistory файлы: найдено ${files.length} файлов из ${userSessionIds.length} сессий`);
+      } else {
+        // Если у пользователя нет записанных сессий (старые файлы), показываем пустой список
+        // но предлагаем сыграть новые раздачи
+        files = [];
+        console.log(`👤 Пользователь ${req.user.email} не имеет записанных сессий. Нужно сыграть новые раздачи.`);
+      }
     } else {
       console.log(`👑 Администратор ${req.user.email} запросил все HandHistory файлы: найдено ${files.length} файлов`);
     }
