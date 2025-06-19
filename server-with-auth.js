@@ -3469,13 +3469,20 @@ async function startServer() {
   try {
     await initializeDatabase();
     
-    server.listen(PORT, () => {
-      console.log('🚀 Сервер с аутентификацией запущен на порту', PORT);
-      console.log('🌐 Доступен по адресу: http://localhost:' + PORT);
+      server.listen(PORT, '0.0.0.0', () => {
+    console.log('🚀 Сервер с аутентификацией запущен на порту', PORT);
+    
+    if (process.env.RAILWAY_STATIC_URL) {
+      console.log('🌐 Railway URL:', process.env.RAILWAY_STATIC_URL);
+      console.log('🔐 API аутентификации:', process.env.RAILWAY_STATIC_URL + '/api/auth');
+      console.log('🎨 Интегрированный интерфейс:', process.env.RAILWAY_STATIC_URL);
+    } else {
+      console.log('🌐 Локальный адрес: http://localhost:' + PORT);
       console.log('🔐 API аутентификации: http://localhost:' + PORT + '/api/auth');
       console.log('🎨 Интегрированный интерфейс: http://localhost:' + PORT);
       console.log('📊 Для тестирования запустите: node test-auth-api.js');
-    });
+    }
+  });
   } catch (error) {
     console.error('❌ Ошибка запуска сервера:', error);
     process.exit(1);
