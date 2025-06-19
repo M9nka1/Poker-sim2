@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poker Simulator 2.0</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="auth-styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Экран аутентификации -->
+        <div id="auth-screen" class="auth-overlay">
+            <div class="auth-container">
+                <div class="auth-header">
+                    <div class="auth-logo">
+                        <i class="fas fa-spade-suit"></i>
+                        <h1>Poker Simulator 2.0</h1>
+                    </div>
+                    <p class="auth-subtitle">Профессиональный тренинг для покера</p>
+                </div>
+
+                <!-- Форма входа -->
+                <div id="login-form" class="auth-form active">
+                    <div class="form-header">
+                        <h2><i class="fas fa-sign-in-alt"></i> Вход в систему</h2>
+                    </div>
+                    
+                    <form class="auth-form-content">
+                        <div class="input-group">
+                            <div class="input-container">
+                                <i class="fas fa-envelope input-icon"></i>
+                                <input type="email" id="login-email" placeholder="Email" required>
+                            </div>
+                        </div>
+                        
+                        <div class="input-group">
+                            <div class="input-container">
+                                <i class="fas fa-lock input-icon"></i>
+                                <input type="password" id="login-password" placeholder="Пароль" required>
+                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('login-password')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="auth-btn auth-btn-primary" id="login-btn">
+                            <i class="fas fa-sign-in-alt"></i>
+                            <span>Войти</span>
+                            <div class="btn-loading hidden">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </div>
+                        </button>
+                    </form>
+
+                    <div class="auth-divider">
+                        <span>или</span>
+                    </div>
+
+                    <button class="auth-btn auth-btn-secondary" onclick="showRegisterForm()">
+                        <i class="fas fa-user-plus"></i>
+                        Создать аккаунт
+                    </button>
+
+                    <div class="auth-demo">
+                        <p>Демо-данные для тестирования:</p>
+                        <div class="demo-accounts">
+                            <button class="demo-btn" onclick="fillDemoAdmin()">
+                                <i class="fas fa-crown"></i>
+                                Администратор
+                            </button>
+                            <button class="demo-btn" onclick="fillDemoUser()">
+                                <i class="fas fa-user"></i>
+                                Пользователь
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Форма регистрации -->
+                <div id="register-form" class="auth-form">
+                    <div class="form-header">
+                        <h2><i class="fas fa-user-plus"></i> Регистрация</h2>
+                    </div>
+                    
+                    <form class="auth-form-content">
+                        <div class="input-group">
+                            <div class="input-container">
+                                <i class="fas fa-envelope input-icon"></i>
+                                <input type="email" id="register-email" placeholder="Email" required>
+                            </div>
+                        </div>
+                        
+                        <div class="input-group">
+                            <div class="input-container">
+                                <i class="fas fa-lock input-icon"></i>
+                                <input type="password" id="register-password" placeholder="Пароль" required>
+                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('register-password')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <div class="input-container">
+                                <i class="fas fa-lock input-icon"></i>
+                                <input type="password" id="register-password-confirm" placeholder="Подтвердите пароль" required>
+                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('register-password-confirm')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="password-requirements" id="password-requirements">
+                            <h4>Требования к паролю:</h4>
+                            <ul>
+                                <li id="req-length"><i class="fas fa-times"></i> Минимум 8 символов</li>
+                                <li id="req-uppercase"><i class="fas fa-times"></i> Заглавная буква</li>
+                                <li id="req-lowercase"><i class="fas fa-times"></i> Строчная буква</li>
+                                <li id="req-number"><i class="fas fa-times"></i> Цифра</li>
+                                <li id="req-special"><i class="fas fa-times"></i> Специальный символ</li>
+                            </ul>
+                        </div>
+
+                        <button type="submit" class="auth-btn auth-btn-primary" id="register-btn">
+                            <i class="fas fa-user-plus"></i>
+                            <span>Создать аккаунт</span>
+                            <div class="btn-loading hidden">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </div>
+                        </button>
+                    </form>
+
+                    <div class="auth-divider">
+                        <span>или</span>
+                    </div>
+
+                    <button class="auth-btn auth-btn-secondary" onclick="showLoginForm()">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Уже есть аккаунт? Войти
+                    </button>
+                </div>
+
+                <!-- Сообщения об ошибках/успехе -->
+                <div id="auth-message" class="auth-message hidden">
+                    <div class="message-content">
+                        <i class="message-icon"></i>
+                        <span class="message-text"></span>
+                    </div>
+                    <button class="message-close" onclick="hideAuthMessage()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Основное приложение (скрыто до аутентификации) -->
+        <div id="main-app" class="hidden">
+            <!-- Панель пользователя -->
+            <div class="user-panel">
+                <div class="user-info">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-details">
+                        <span class="user-email" id="current-user-email">user@example.com</span>
+                        <div class="user-stats">
+                            <span class="hand-limit">
+                                <i class="fas fa-cards"></i>
+                                <span id="current-hand-limit">0</span> раздач
+                            </span>
+                            <span class="user-role" id="current-user-role">Пользователь</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="user-actions">
+                    <button class="user-btn" id="admin-panel-btn" onclick="toggleAdminPanel()" style="display: none;">
+                        <i class="fas fa-crown"></i>
+                    </button>
+                    <button class="user-btn" onclick="showUserProfile()">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <button class="user-btn logout-btn" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Компактное меню иконок -->
+            <div class="compact-menu">
+                <div class="menu-icon" data-tooltip="Настройки игры" onclick="toggleSettingsPanel()">
+                    <i class="fas fa-cog"></i>
+                </div>
+                <div class="menu-icon" data-tooltip="Мультиплеер" onclick="showMultiplayerMenu()">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="menu-icon session-icon" data-tooltip="Сессия" onclick="showSessionInfo()" style="display: none;">
+                    <i class="fas fa-wifi"></i>
+                    <div class="session-indicator"></div>
+                </div>
+                <div class="menu-icon export-icon" data-tooltip="Экспорт" onclick="exportAllTables()" style="display: none;">
+                    <i class="fas fa-download"></i>
+                </div>
+                <div class="menu-icon files-icon" data-tooltip="Файлы HandHistory" onclick="openHandHistoryManager()" style="display: none;">
+                    <i class="fas fa-folder-open"></i>
+                </div>
+            </div>
+
+            <div class="main-content">
+                <!-- Административная панель -->
+                <div id="admin-panel" class="admin-panel hidden">
+                    <div class="admin-header">
+                        <h2><i class="fas fa-crown"></i> Административная панель</h2>
+                        <button class="close-btn" onclick="toggleAdminPanel()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="admin-content">
+                        <div class="admin-stats">
+                            <div class="stat-card">
+                                <i class="fas fa-users"></i>
+                                <div class="stat-info">
+                                    <span class="stat-value" id="total-users">0</span>
+                                    <span class="stat-label">Пользователей</span>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-cards"></i>
+                                <div class="stat-info">
+                                    <span class="stat-value" id="total-hands">0</span>
+                                    <span class="stat-label">Раздач сыграно</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="admin-actions">
+                            <button class="admin-btn" onclick="loadAllUsers()">
+                                <i class="fas fa-users"></i>
+                                Управление пользователями
+                            </button>
+                            <button class="admin-btn" onclick="exportAllHands()">
+                                <i class="fas fa-download"></i>
+                                Экспорт всех раздач
+                            </button>
+                        </div>
+
+                        <div id="users-list" class="users-list hidden">
+                            <h3>Список пользователей</h3>
+                            <div class="users-table">
+                                <div class="table-header">
+                                    <span>Email</span>
+                                    <span>Лимит раздач</span>
+                                    <span>Роли</span>
+                                    <span>Действия</span>
+                                </div>
+                                <div id="users-table-body" class="table-body">
+                                    <!-- Пользователи будут загружены динамически -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Остальной контент из оригинального index.html -->
+                <!-- Панель настроек -->
+                <div class="settings-panel" id="settings-panel">
+                    <div class="settings-header">
+                        <h2><i class="fas fa-sliders-h"></i> Настройки</h2>
+                        <button id="close-settings" class="close-btn">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <div class="settings-content">
+                        <!-- Кнопки управления сессией -->
+                        <div class="session-controls">
+                            <button id="start-session" class="btn btn-primary">
+                                <i class="fas fa-play"></i> Создать сессию
+                            </button>
+                            <button id="join-session" class="btn btn-secondary">
+                                <i class="fas fa-sign-in-alt"></i> Присоединиться
+                            </button>
+                            <button id="download-hands-btn" class="btn btn-secondary" style="display: none;">
+                                <i class="fas fa-download"></i> Скачать Hand History
+                            </button>
+                        </div>
+
+                        <!-- Префлоп спот -->
+                        <div class="setting-block">
+                            <h3><i class="fas fa-file-alt"></i> Префлоп спот</h3>
+                            <div class="preflop-selector">
+                                <div class="custom-select-container">
+                                    <div id="preflop-spot-select" class="custom-select">
+                                        <div class="select-trigger">
+                                            <span class="select-text">Выберите префлоп спот...</span>
+                                            <span class="select-arrow">▼</span>
+                                        </div>
+                                        <div class="select-dropdown">
+                                            <div class="select-options">
+                                                <!-- Опции будут загружены динамически -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="preflop-content" class="preflop-preview"></div>
+                            </div>
+                        </div>
+
+                        <!-- Количество столов и рейк -->
+                        <div class="setting-block">
+                            <h3><i class="fas fa-table"></i> Столы и рейк</h3>
+                            <div class="tables-count">
+                                <label>Количество столов:</label>
+                                <div class="btn-group">
+                                    <button class="table-btn active" data-tables="1">1</button>
+                                    <button class="table-btn" data-tables="2">2</button>
+                                    <button class="table-btn" data-tables="3">3</button>
+                                    <button class="table-btn" data-tables="4">4</button>
+                                </div>
+                            </div>
+                            <div class="rake-settings">
+                                <div class="rake-input">
+                                    <label>% рейка:</label>
+                                    <input type="number" id="rake-percent" min="0" max="10" step="0.1" value="5" />
+                                </div>
+                                <div class="rake-input">
+                                    <label>$ рейка (cap):</label>
+                                    <input type="number" id="rake-dollar" min="0" step="0.01" value="1.00" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Настройки карт -->
+                        <div class="setting-block">
+                            <h3><i class="fas fa-cards"></i> Настройки карт</h3>
+                            <div class="street-tabs">
+                                <button class="street-tab active" data-street="flop">Флоп</button>
+                                <button class="street-tab" data-street="turn">Тёрн</button>
+                                <button class="street-tab" data-street="river">Ривер</button>
+                            </div>
+
+                            <div id="flop-settings" class="street-settings active">
+                                <!-- Конкретный флоп -->
+                                <div class="specific-cards">
+                                    <h4>Конкретный флоп:</h4>
+                                    <div class="card-selector">
+                                        <div class="card-placeholder" data-card="1">
+                                            <i class="fas fa-question"></i>
+                                        </div>
+                                        <div class="card-placeholder" data-card="2">
+                                            <i class="fas fa-question"></i>
+                                        </div>
+                                        <div class="card-placeholder" data-card="3">
+                                            <i class="fas fa-question"></i>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Масти -->
+                                <div class="suits-settings">
+                                    <h4>Масти:</h4>
+                                    <div class="btn-group">
+                                        <button class="suit-btn active" data-suit="any">Любой</button>
+                                        <button class="suit-btn" data-suit="flush-draw">Флеш-дро</button>
+                                        <button class="suit-btn" data-suit="rainbow">Радуга</button>
+                                        <button class="suit-btn" data-suit="monotone">Монотонный</button>
+                                    </div>
+                                </div>
+
+                                <!-- Спаренность -->
+                                <div class="pairing-settings">
+                                    <h4>Спаренность:</h4>
+                                    <div class="btn-group">
+                                        <button class="pair-btn active" data-pair="any">Любой</button>
+                                        <button class="pair-btn" data-pair="unpaired">Не спаренный</button>
+                                        <button class="pair-btn" data-pair="paired">Спаренный</button>
+                                        <button class="pair-btn" data-pair="trips">Трипл</button>
+                                    </div>
+                                </div>
+
+                                <!-- Старшинство карт -->
+                                <div class="rank-settings">
+                                    <h4>Старшинство карт:</h4>
+                                    <div class="rank-group">
+                                        <label>Высокая карта:</label>
+                                        <div class="rank-buttons" data-rank-type="high">
+                                            <button class="rank-btn active" data-rank="any">Любой</button>
+                                            <button class="rank-btn" data-rank="A">A</button>
+                                            <button class="rank-btn" data-rank="K">K</button>
+                                            <button class="rank-btn" data-rank="Q">Q</button>
+                                            <button class="rank-btn" data-rank="J">J</button>
+                                            <button class="rank-btn" data-rank="T">T</button>
+                                            <button class="rank-btn" data-rank="9">9</button>
+                                            <button class="rank-btn" data-rank="8">8</button>
+                                            <button class="rank-btn" data-rank="7">7</button>
+                                            <button class="rank-btn" data-rank="6">6</button>
+                                            <button class="rank-btn" data-rank="5">5</button>
+                                            <button class="rank-btn" data-rank="4">4</button>
+                                            <button class="rank-btn" data-rank="3">3</button>
+                                            <button class="rank-btn" data-rank="2">2</button>
+                                        </div>
+                                    </div>
+                                    <div class="rank-group">
+                                        <label>Средняя карта:</label>
+                                        <div class="rank-buttons" data-rank-type="middle">
+                                            <button class="rank-btn active" data-rank="any">Любой</button>
+                                            <button class="rank-btn" data-rank="A">A</button>
+                                            <button class="rank-btn" data-rank="K">K</button>
+                                            <button class="rank-btn" data-rank="Q">Q</button>
+                                            <button class="rank-btn" data-rank="J">J</button>
+                                            <button class="rank-btn" data-rank="T">T</button>
+                                            <button class="rank-btn" data-rank="9">9</button>
+                                            <button class="rank-btn" data-rank="8">8</button>
+                                            <button class="rank-btn" data-rank="7">7</button>
+                                            <button class="rank-btn" data-rank="6">6</button>
+                                            <button class="rank-btn" data-rank="5">5</button>
+                                            <button class="rank-btn" data-rank="4">4</button>
+                                            <button class="rank-btn" data-rank="3">3</button>
+                                            <button class="rank-btn" data-rank="2">2</button>
+                                        </div>
+                                    </div>
+                                    <div class="rank-group">
+                                        <label>Нижняя карта:</label>
+                                        <div class="rank-buttons" data-rank-type="low">
+                                            <button class="rank-btn active" data-rank="any">Любой</button>
+                                            <button class="rank-btn" data-rank="A">A</button>
+                                            <button class="rank-btn" data-rank="K">K</button>
+                                            <button class="rank-btn" data-rank="Q">Q</button>
+                                            <button class="rank-btn" data-rank="J">J</button>
+                                            <button class="rank-btn" data-rank="T">T</button>
+                                            <button class="rank-btn" data-rank="9">9</button>
+                                            <button class="rank-btn" data-rank="8">8</button>
+                                            <button class="rank-btn" data-rank="7">7</button>
+                                            <button class="rank-btn" data-rank="6">6</button>
+                                            <button class="rank-btn" data-rank="5">5</button>
+                                            <button class="rank-btn" data-rank="4">4</button>
+                                            <button class="rank-btn" data-rank="3">3</button>
+                                            <button class="rank-btn" data-rank="2">2</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="turn-settings" class="street-settings">
+                                <p>Настройки для Тёрна (аналогично флопу)</p>
+                            </div>
+
+                            <div id="river-settings" class="street-settings">
+                                <p>Настройки для Ривера (аналогично флопу)</p>
+                            </div>
+                        </div>
+
+                        <!-- Матрицы рук -->
+                        <div class="setting-block">
+                            <h3><i class="fas fa-hand-paper"></i> Диапазоны рук</h3>
+                            
+                            <!-- Выбор позиций -->
+                            <div class="position-selection">
+                                <h4>Позиции игроков:</h4>
+                                <div class="position-controls">
+                                    <div class="position-group">
+                                        <label>Игрок 1:</label>
+                                        <div class="position-options">
+                                            <div class="position-buttons">
+                                                <button class="position-btn active" data-player="1" data-position="BTN">BTN</button>
+                                                <button class="position-btn" data-player="1" data-position="EP">EP</button>
+                                                <button class="position-btn" data-player="1" data-position="MP">MP</button>
+                                                <button class="position-btn" data-player="1" data-position="CO">CO</button>
+                                                <button class="position-btn" data-player="1" data-position="SB">SB</button>
+                                                <button class="position-btn" data-player="1" data-position="BB">BB</button>
+                                            </div>
+                                            <div class="position-toggle">
+                                                <span class="toggle-label">или:</span>
+                                                <div class="ip-oop-buttons">
+                                                    <button class="oop-ip-btn" data-player="1" data-position="IP">IP</button>
+                                                    <button class="oop-ip-btn" data-player="1" data-position="OOP">OOP</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="position-group">
+                                        <label>Игрок 2:</label>
+                                        <div class="position-options">
+                                            <div class="position-buttons">
+                                                <button class="position-btn" data-player="2" data-position="EP">EP</button>
+                                                <button class="position-btn" data-player="2" data-position="MP">MP</button>
+                                                <button class="position-btn" data-player="2" data-position="CO">CO</button>
+                                                <button class="position-btn" data-player="2" data-position="BTN">BTN</button>
+                                                <button class="position-btn" data-player="2" data-position="SB">SB</button>
+                                                <button class="position-btn active" data-player="2" data-position="BB">BB</button>
+                                            </div>
+                                            <div class="position-toggle">
+                                                <span class="toggle-label">или:</span>
+                                                <div class="ip-oop-buttons">
+                                                    <button class="oop-ip-btn" data-player="2" data-position="IP">IP</button>
+                                                    <button class="oop-ip-btn" data-player="2" data-position="OOP">OOP</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Игрок 1 -->
+                            <div class="player-range">
+                                <h4>Игрок 1 (создатель сессии):</h4>
+                                <div class="range-controls">
+                                    <input type="range" id="player1-range" min="0" max="100" value="0" class="range-slider">
+                                    <span class="range-value">0%</span>
+                                    <button class="paste-btn" title="Вставить из буфера">
+                                        <i class="fas fa-paste"></i>
+                                    </button>
+                                    <div class="range-selector">
+                                        <div class="custom-select-container" id="range-select-player1">
+                                            <div class="custom-select">
+                                                <div class="select-trigger">
+                                                    <span class="select-text">Ranges</span>
+                                                    <span class="select-arrow">▼</span>
+                                                </div>
+                                                <div class="select-dropdown">
+                                                    <div class="select-options"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="player1-matrix" class="hand-matrix">
+                                    <!-- Матрица рук будет сгенерирована JS -->
+                                </div>
+                            </div>
+
+                            <!-- Игрок 2 -->
+                            <div class="player-range">
+                                <h4>Игрок 2 (присоединившийся):</h4>
+                                <div class="range-controls">
+                                    <input type="range" id="player2-range" min="0" max="100" value="0" class="range-slider">
+                                    <span class="range-value">0%</span>
+                                    <button class="paste-btn" title="Вставить из буфера">
+                                        <i class="fas fa-paste"></i>
+                                    </button>
+                                    <div class="range-selector">
+                                        <div class="custom-select-container" id="range-select-player2">
+                                            <div class="custom-select">
+                                                <div class="select-trigger">
+                                                    <span class="select-text">Ranges</span>
+                                                    <span class="select-arrow">▼</span>
+                                                </div>
+                                                <div class="select-dropdown">
+                                                    <div class="select-options"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="player2-matrix" class="hand-matrix">
+                                    <!-- Матрица рук будет сгенерирована JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Область столов -->
+                <div class="tables-area" id="tables-area">
+                    <div class="welcome-screen" id="welcome-screen">
+                        <div class="welcome-content">
+                            <div class="welcome-icon">
+                                <i class="fas fa-spade-suit"></i>
+                            </div>
+                            <h2>Добро пожаловать в Poker Simulator 2.0</h2>
+                            <p>Выберите настройки и создайте сессию для начала игры</p>
+                        </div>
+                    </div>
+
+                    <div class="tables-grid hidden" id="tables-grid">
+                        <!-- Столы будут созданы динамически -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальные окна -->
+    <div id="user-profile-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user"></i> Профиль пользователя</h3>
+                <button class="close-btn" onclick="closeUserProfile()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="profile-info">
+                    <div class="profile-field">
+                        <label>Email:</label>
+                        <span id="profile-email">user@example.com</span>
+                    </div>
+                    <div class="profile-field">
+                        <label>Лимит раздач:</label>
+                        <span id="profile-hand-limit">0</span>
+                    </div>
+                    <div class="profile-field">
+                        <label>Дата регистрации:</label>
+                        <span id="profile-created-at">-</span>
+                    </div>
+                </div>
+                
+                <div class="profile-actions">
+                    <button class="btn btn-primary" onclick="downloadUserHands()">
+                        <i class="fas fa-download"></i>
+                        Скачать мои раздачи
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подключение скриптов -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="auth.js"></script>
+    <script src="script.js"></script>
+    <script src="client-multiplayer.js"></script>
+</body>
+</html> 

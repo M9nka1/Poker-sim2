@@ -1,0 +1,14 @@
+BTN vs BB - Test Hand History (BTN Pio_Hero, BB Pio_Villain)
+
+Seat 1: Pio_Hero ($100.00 in chips) 
+Seat 2: Pio_Villain ($97.50 in chips) 
+Pio_Hero: posts small blind $0.50
+Pio_Villain: posts big blind $1.00
+
+*** HOLE CARDS ***
+Dealt to Pio_Hero [Kh Qs]
+Pio_Hero: raises $2.50 to $3.50
+Pio_Villain: calls $2.50
+
+*** FLOP ***
+FLOP_PLACEHOLDER 

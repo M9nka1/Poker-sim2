@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест системы отображения действий</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .test-button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .test-button:hover {
+            background: #45a049;
+        }
+        .actions-display {
+            background: #333;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            min-height: 50px;
+        }
+        .actions-text {
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .hero-actions-display {
+            border-left: 3px solid #4CAF50;
+        }
+        .opponent-actions-display {
+            border-left: 3px solid #f44336;
+        }
+        .log {
+            background: #111;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .action-check { color: #90EE90; }
+        .action-call { color: #87CEEB; }
+        .action-bet { color: #FFD700; }
+        .action-raise { color: #FF6347; }
+        .action-fold { color: #A9A9A9; }
+        .street-separator { color: #888; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Тест системы отображения действий</h1>
+        
+        <div class="test-section">
+            <h3>Контейнеры для записи действий</h3>
+            
+            <div data-table-id="1">
+                <h4>Герой (Hero)</h4>
+                <div class="hero-actions-display actions-display">
+                    <div class="actions-text"></div>
+                </div>
+                
+                <h4>Оппонент (Opponent)</h4>
+                <div class="opponent-actions-display actions-display">
+                    <div class="actions-text"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Тестовые действия</h3>
+            <button class="test-button" onclick="testHeroAction('check', 0)">Hero Check</button>
+            <button class="test-button" onclick="testHeroAction('bet', 1000)">Hero Bet $10</button>
+            <button class="test-button" onclick="testHeroAction('call', 500)">Hero Call $5</button>
+            <button class="test-button" onclick="testHeroAction('raise', 2000)">Hero Raise $20</button>
+            <button class="test-button" onclick="testHeroAction('fold', 0)">Hero Fold</button>
+            
+            <br><br>
+            
+            <button class="test-button" onclick="testOpponentAction('check', 0)">Opponent Check</button>
+            <button class="test-button" onclick="testOpponentAction('bet', 1500)">Opponent Bet $15</button>
+            <button class="test-button" onclick="testOpponentAction('call', 1000)">Opponent Call $10</button>
+            <button class="test-button" onclick="testOpponentAction('raise', 3000)">Opponent Raise $30</button>
+            <button class="test-button" onclick="testOpponentAction('fold', 0)">Opponent Fold</button>
+            
+            <br><br>
+            
+            <button class="test-button" onclick="changeStreet('turn')">Смена на Turn</button>
+            <button class="test-button" onclick="changeStreet('river')">Смена на River</button>
+            <button class="test-button" onclick="resetActions()">Сброс действий</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>Лог событий</h3>
+            <div id="log" class="log"></div>
+            <button class="test-button" onclick="clearLog()">Очистить лог</button>
+        </div>
+    </div>
+
+    <script>
+        // Имитация ActionTracker
+        class TestActionTracker {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.heroActions = {
+                    flop: [],
+                    turn: [],
+                    river: []
+                };
+                this.opponentActions = {
+                    flop: [],
+                    turn: [],
+                    river: []
+                };
+                this.currentStreet = 'flop';
+                this.lastRecordedActions = new Map();
+                this.log('ActionTracker сброшен');
+            }
+
+            setStreet(street) {
+                const oldStreet = this.currentStreet;
+                this.currentStreet = street;
+                this.log(`Улица изменена с ${oldStreet} на ${street}`);
+                this.lastRecordedActions.clear();
+            }
+
+            addAction(playerId, action, amount, isHero) {
+                const actionCode = this.getActionCode(action, amount);
+                const playerActions = isHero ? this.heroActions : this.opponentActions;
+                
+                this.log(`Добавление действия: ${isHero ? 'Hero' : 'Opponent'} ${action} ${amount} на ${this.currentStreet}`);
+                
+                const actionKey = `${playerId}_${this.currentStreet}_${action}_${amount}`;
+                
+                if (this.lastRecordedActions.has(actionKey)) {
+                    this.log(`⚠️ Пропускаем дублированное действие: ${actionCode}`);
+                    return;
+                }
+                
+                if (playerActions[this.currentStreet]) {
+                    playerActions[this.currentStreet].push(actionCode);
+                    this.lastRecordedActions.set(actionKey, true);
+                    this.log(`✅ Добавлено: ${actionCode} на ${this.currentStreet}`);
+                } else {
+                    this.log(`❌ Неизвестная улица: ${this.currentStreet}`);
+                }
+            }
+
+            getActionCode(action, amount) {
+                switch (action) {
+                    case 'check':
+                        return '<span class="action-check">Check</span>';
+                    case 'call':
+                        return `<span class="action-call">Call ${this.formatAmount(amount)}</span>`;
+                    case 'bet':
+                        return `<span class="action-bet">Bet ${this.formatAmount(amount)}</span>`;
+                    case 'raise':
+                        return `<span class="action-raise">Raise ${this.formatAmount(amount)}</span>`;
+                    case 'fold':
+                        return '<span class="action-fold">Fold</span>';
+                    default:
+                        return `<span class="action-check">${action}</span>`;
+                }
+            }
+
+            formatAmount(amount) {
+                const dollars = amount / 100;
+                if (dollars >= 1000) {
+                    return `$${(dollars / 1000).toFixed(1).replace('.0', '')}k`;
+                } else if (dollars % 1 === 0) {
+                    return `$${dollars}`;
+                } else {
+                    return `$${dollars.toFixed(2).replace(/\.?0+$/, '')}`;
+                }
+            }
+
+            getActionsString(isHero) {
+                const playerActions = isHero ? this.heroActions : this.opponentActions;
+                const streets = [];
+
+                if (playerActions.flop.length > 0) {
+                    const flopActions = playerActions.flop.join(' ');
+                    streets.push(`Flop: ${flopActions}`);
+                }
+                if (playerActions.turn.length > 0) {
+                    const turnActions = playerActions.turn.join(' ');
+                    streets.push(`Turn: ${turnActions}`);
+                }
+                if (playerActions.river.length > 0) {
+                    const riverActions = playerActions.river.join(' ');
+                    streets.push(`River: ${riverActions}`);
+                }
+
+                return streets.join('<span class="street-separator"> | </span>');
+            }
+
+            log(message) {
+                const logElement = document.getElementById('log');
+                const timestamp = new Date().toLocaleTimeString();
+                logElement.innerHTML += `[${timestamp}] ${message}<br>`;
+                logElement.scrollTop = logElement.scrollHeight;
+            }
+        }
+
+        // Инициализация
+        const tracker = new TestActionTracker();
+
+        function updateActionDisplays() {
+            const heroElement = document.querySelector('.hero-actions-display .actions-text');
+            const opponentElement = document.querySelector('.opponent-actions-display .actions-text');
+            
+            if (heroElement) {
+                const heroActionsString = tracker.getActionsString(true);
+                heroElement.innerHTML = heroActionsString || '<em>Нет действий</em>';
+                tracker.log(`Hero display обновлен: "${heroActionsString}"`);
+            }
+            
+            if (opponentElement) {
+                const opponentActionsString = tracker.getActionsString(false);
+                opponentElement.innerHTML = opponentActionsString || '<em>Нет действий</em>';
+                tracker.log(`Opponent display обновлен: "${opponentActionsString}"`);
+            }
+        }
+
+        function testHeroAction(action, amount) {
+            tracker.addAction('hero-123', action, amount, true);
+            updateActionDisplays();
+        }
+
+        function testOpponentAction(action, amount) {
+            tracker.addAction('opponent-456', action, amount, false);
+            updateActionDisplays();
+        }
+
+        function changeStreet(street) {
+            tracker.setStreet(street);
+            updateActionDisplays();
+        }
+
+        function resetActions() {
+            tracker.reset();
+            updateActionDisplays();
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Инициализация отображения
+        updateActionDisplays();
+    </script>
+</body>
+</html> 

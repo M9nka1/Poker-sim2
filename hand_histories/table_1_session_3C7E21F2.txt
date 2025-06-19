@@ -1,0 +1,35 @@
+PokerStars Hand #175034810143011: Hold'em No Limit ($0.50/$1.00) - 2025/06/19 21:48:21 GMT+03:00 GMT+03:00
+Table 'PioSolver Table' 6-max Seat #2 is the button
+Seat 1: C_3bet_vs_BTN ($12.25 in chips)
+Seat 2: 3bet_BTN_vs_CO ($12.25 in chips)
+Seat 3: Pio_SB ($12.25 in chips)
+Seat 4: Pio_BB ($12.25 in chips)
+Seat 5: Pio_EP ($12.25 in chips)
+Seat 6: Pio_MP ($12.25 in chips)
+Pio_SB: posts small blind $0.50
+Pio_BB: posts big blind $1.00
+*** HOLE CARDS ***
+Pio_EP: folds
+Pio_MP: folds
+C_3bet_vs_BTN: raises $1.50 to $2.50
+3bet_BTN_vs_CO: raises $4.75 to $7.25
+Pio_SB: folds
+Pio_BB: folds
+C_3bet_vs_BTN: calls $4.75
+*** FLOP *** [Jh 9s 8s]
+C_3bet_vs_BTN: checks
+3bet_BTN_vs_CO: bets $5.00
+C_3bet_vs_BTN: calls $5.00
+*** TURN *** [Jh 9s 8s] [9d]
+*** RIVER *** [Jh 9s 8s 9d] [7d]
+*** SUMMARY ***
+Total pot $26.00 | Rake $1.00
+Board [Jh 9s 8s 9d 7d]
+Seat 1: C_3bet_vs_BTN showed [Qs 5s]
+Seat 2: 3bet_BTN_vs_CO (button) showed [Kd 6d] and won ($25.00)
+Seat 3: Pio_SB (small blind) folded before Flop
+Seat 4: Pio_BB (big blind) folded before Flop
+Seat 5: Pio_EP folded before Flop (didn't bet)
+Seat 6: Pio_MP folded before Flop (didn't bet)
+
+

@@ -1,0 +1,88 @@
+PokerStars Hand #1715026663156611: Hold'em No Limit ($1/$2) - 2025-06-18T17:10:44.681Z
+Table '1' 2-max Seat #2 is the button
+Seat 1: CC_BB_OOP_vs_BTN ($97.50 in chips)
+Seat 2: RFI_IP_BTN ($97.50 in chips)
+CC_BB_OOP_vs_BTN: posts small blind $1.00
+RFI_IP_BTN: posts big blind $2.00
+*** HOLE CARDS ***
+RFI_IP_BTN: raises $113.00 to $115.00
+CC_BB_OOP_vs_BTN: calls $114.00
+*** FLOP *** [8s 7d 3h]
+CC_BB_OOP_vs_BTN: checks
+RFI_IP_BTN: checks
+*** TURN *** [8s 7d 3h] [4d]
+CC_BB_OOP_vs_BTN: bets $330.00
+RFI_IP_BTN: calls $330.00
+*** RIVER *** [8s 7d 3h 4d] [Kc]
+CC_BB_OOP_vs_BTN: checks
+RFI_IP_BTN: checks
+*** SHOW DOWN ***
+CC_BB_OOP_vs_BTN: shows [Ah Th]
+RFI_IP_BTN: shows [Jc Tc]
+*** SUMMARY ***
+Total pot $2010.00 | Rake $0.00
+Board [8s 7d 3h 4d Kc]
+Seat 1: CC_BB_OOP_vs_BTN (small blind) showed [Ah Th] and won ($2010.00)
+Seat 2: RFI_IP_BTN (big blind) showed [Jc Tc]
+
+---
+
+Пример с большим количеством игроков в префлопе:
+
+PokerStars Hand #4400520541168030866: Hold'em No Limit ($5.00/$10.00) - 2024/12/14 2:21:47 GMT+03:00
+Table 'PioSolver Table' 6-max Seat #6 is the button
+Seat 1: Pio_OOP_3bet_SB ($1000.00 in chips)
+Seat 2: Pio_BB ($1000.00 in chips)
+Seat 3: Pio_EP ($1000.00 in chips)
+Seat 4: Pio_MP ($1000.00 in chips)
+Seat 5: Pio_CO ($1000.00 in chips)
+Seat 6: Pio_IP_c3bBU ($1000.00 in chips)
+Pio_OOP_3bet_SB: posts small blind $5.00
+Pio_BB: posts big blind $10.00
+*** HOLE CARDS ***
+Pio_EP: folds
+Pio_MP: folds
+Pio_CO: folds
+Pio_IP_c3bBU: raises $15.00 to $25.00
+Pio_OOP_3bet_SB: raises $85.00 to $110.00
+Pio_BB: folds
+Pio_IP_c3bBU: calls $85.00
+*** FLOP *** [6h 5d 2h]
+Pio_OOP_3bet_SB: bets $172.00
+Pio_IP_c3bBU: folds
+Uncalled bet ($172.00) returned to Pio_OOP_3bet_SB
+Pio_OOP_3bet_SB collected $230.00 from the pot
+*** SHOW DOWN ***
+Pio_OOP_3bet_SB: shows [Ah Th]
+Pio_IP_c3bBU: shows [Jc Tc]
+*** SUMMARY ***
+Total pot $230.00 | Rake $0.00
+Board [6h 5d 2h]
+Seat 1: Pio_OOP_3bet_SB (small blind) showed [Ah Th] and won ($230.00)
+Seat 2: Pio_BB (big blind) folded before Flop
+Seat 3: Pio_EP folded before Flop (didn't bet)
+Seat 4: Pio_MP folded before Flop (didn't bet)
+Seat 5: Pio_CO folded before Flop (didn't bet)
+Seat 6: Pio_IP_c3bBU (button) showed [Jc Tc]
+
+---
+
+Ключевые улучшения в SUMMARY секции:
+
+✅ ТЕПЕРЬ ВКЛЮЧАЕТ ВСЕ МЕСТА ИЗ ПРЕФЛОПА:
+- Показывает всех игроков, включая тех кто сфолдил в префлопе
+- Правильно определяет позиции (small blind, big blind, button)
+- Различает фолды "didn't bet" vs обычные фолды
+
+✅ КОРРЕКТНОЕ ОТОБРАЖЕНИЕ КАРТ:
+- Показывает карты победителей с "and won"
+- Показывает карты проигравших без "and won"
+- Не показывает карты игроков, сфолдивших в префлопе
+
+✅ ПРАВИЛЬНАЯ ЛОГИКА ФОЛДОВ:
+- "folded before Flop (didn't bet)" - для игроков которые не ставили
+- "folded before Flop" - для игроков которые ставили блайнды
+- "folded on the Flop/Turn/River" - для игроков сфолдивших постфлоп
+
+Это полностью соответствует формату PokerStars и обеспечивает
+полную информацию о всех участниках раздачи. 

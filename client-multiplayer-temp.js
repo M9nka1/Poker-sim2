@@ -630,32 +630,25 @@ class MultiplayerClient {
           </div>
         </div>
 
-        <!-- Нижняя строка: информация о герое слева, карты в центре, действия справа -->
-        <div class="hero-center-row">
-          <div class="hero-info-left">
-            <div class="player-info-section">
+        <!-- Герой как единый блок (аналогично верхнему игроку) -->
+        <div class="hero-area">
+          <div class="player-section hero-green">
+            <div class="player-cards-section">
+              ${this.renderHeroCards(heroPlayer)}
+            </div>
+            <div class="player-info-horizontal-green">
               ${heroPlayer ? `
                 <div class="player-name">${heroPlayer.name}</div>
                 <div class="player-position">${heroPlayer.position}</div>
-                <div class="player-stack">Стек: $${((heroPlayer.stack || 0) / 100).toFixed(2)}</div>
+                <div class="player-stack">$${((heroPlayer.stack || 0) / 100).toFixed(2)}</div>
               ` : ''}
             </div>
-          </div>
-          <div class="hero-cards-center">
-            ${this.renderHeroCards(heroPlayer)}
           </div>
           <div class="actions-right">
             <div class="table-actions">
               ${this.renderTableActions(tableInfo, tableInfo.tableId)}
             </div>
           </div>
-        </div>
-
-        <!-- Контроллы управления рукой -->
-        <div class="hand-controls">
-          <button class="btn btn-secondary" onclick="multiplayerClient.newHand('${tableInfo.tableId}')">
-            <i class="fas fa-redo"></i> Новая рука
-          </button>
         </div>
       </div>
     `;
@@ -1098,7 +1091,7 @@ class MultiplayerClient {
       }
       
       // Обновить информацию о герое
-      const heroInfoArea = tableElement.querySelector('.hero-info-left .player-info-section');
+      const heroInfoArea = tableElement.querySelector('.player-section.hero-green .player-info-horizontal-green');
       if (heroInfoArea) {
         const heroStack = (heroPlayer.stack || 0) / 100; // конвертируем в доллары
         heroInfoArea.innerHTML = `

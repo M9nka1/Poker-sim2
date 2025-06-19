@@ -1,21 +1,17 @@
+SB vs BTN Call 3bet IP vs OOP (Pio_IP_c3bBU IP, Pio_OOP_3bet_SB OOP)
+
 PokerStars Hand #4400520541168030866: Hold'em No Limit ($5.00/$10.00) - 2024/12/14 2:21:47 GMT+03:00
 Table 'PioSolver Table' 6-max Seat #6 is the button
 Seat 1: Pio_OOP_3bet_SB ($1000.00 in chips)
-Seat 2: Pio_BB ($1000.00 in chips)
-Seat 3: Pio_EP ($1000.00 in chips)
-Seat 4: Pio_MP ($1000.00 in chips)
-Seat 5: Pio_CO ($1000.00 in chips)
 Seat 6: Pio_IP_c3bBU ($1000.00 in chips)
 Pio_OOP_3bet_SB: posts small blind $5.00
-Pio_BB: posts big blind $10.00
-*** HOLE CARDS ***
-Pio_EP: folds
-Pio_MP: folds
-Pio_CO: folds
 Pio_IP_c3bBU: raises $15.00 to $25.00
 Pio_OOP_3bet_SB: raises $85.00 to $110.00
-Pio_BB: folds
 Pio_IP_c3bBU: calls $85.00
 
-(Pio_IP_c3bBU IP
-Pio_OOP_3bet_SB OOP)
+Тест иерархии позиций:
+1. SB vs BTN -> SB = OOP, BTN = IP ✓
+2. BB vs BTN -> BB = OOP, BTN = IP ✓  
+3. EP vs CO -> EP = OOP, CO = IP ✓
+4. MP vs BTN -> MP = OOP, BTN = IP ✓
+5. CO vs BTN -> CO = OOP, BTN = IP ✓ 

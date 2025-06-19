@@ -1,0 +1,67 @@
+PokerStars Hand #175026799237211: Hold'em No Limit ($0.50/$1.00) - 2025-06-18T17:33:12.372Z.372Z GMT+03:00
+Table 'PioSolver Table' 6-max Seat #5 is the button
+Seat 1: CC_BB_OOP_vsCO ($100.00 in chips)
+Seat 2: Pio_EP ($100.00 in chips)
+Seat 3: Pio_MP ($100.00 in chips)
+Seat 4: RFI_IP_CO ($100.00 in chips)
+Seat 5: Pio_BTN ($100.00 in chips)
+Seat 6: Pio_SB ($100.00 in chips)
+Pio_SB: posts small blind $0.50
+CC_BB_OOP_vsCO: posts big blind $1.00
+*** HOLE CARDS ***
+Pio_EP: folds
+Pio_MP: folds
+RFI_IP_CO: raises $1.75 to $2.50
+Pio_BTN: folds
+Pio_SB: folds
+CC_BB_OOP_vs_CO: calls $1.50
+*** FLOP *** [3s 8s 2d]
+CC_BB_OOP_vs_CO: checks
+RFI_IP_CO: checks
+*** TURN *** [3s 8s 2d] [2s]
+CC_BB_OOP_vs_CO: checks
+RFI_IP_CO: checks
+*** RIVER *** [3s 8s 2d 2s] [Jd]
+CC_BB_OOP_vs_CO: checks
+RFI_IP_CO: checks
+*** SUMMARY ***
+Total pot $5.50 | Rake $0.28
+Board [3s 8s 2d 2s Jd]
+Seat 0: CC_BB_OOP_vs_CO won ($5.22)
+
+
+PokerStars Hand #175026804200912: Hold'em No Limit ($0.50/$1.00) - 2025-06-18T17:34:02.009Z.009Z GMT+03:00
+Table 'PioSolver Table' 6-max Seat #5 is the button
+Seat 1: CC_BB_OOP_vsCO ($100.00 in chips)
+Seat 2: Pio_EP ($100.00 in chips)
+Seat 3: Pio_MP ($100.00 in chips)
+Seat 4: RFI_IP_CO ($100.00 in chips)
+Seat 5: Pio_BTN ($100.00 in chips)
+Seat 6: Pio_SB ($100.00 in chips)
+Pio_SB: posts small blind $0.50
+CC_BB_OOP_vsCO: posts big blind $1.00
+*** HOLE CARDS ***
+Pio_EP: folds
+Pio_MP: folds
+RFI_IP_CO: raises $1.75 to $2.50
+Pio_BTN: folds
+Pio_SB: folds
+CC_BB_OOP_vs_CO: calls $1.50
+*** FLOP *** [8c Ks 3d]
+CC_BB_OOP_vs_CO: checks
+RFI_IP_CO: checks
+*** TURN *** [8c Ks 3d] [6d]
+CC_BB_OOP_vs_CO: checks
+RFI_IP_CO: checks
+*** RIVER *** [8c Ks 3d 6d] [Qc]
+CC_BB_OOP_vs_CO: bets $2.75
+RFI_IP_CO: raises $2.75 to $5.50
+CC_BB_OOP_vs_CO: raises $5.50 to $11.00
+RFI_IP_CO: raises $11.00 to $22.00
+CC_BB_OOP_vs_CO: calls $11.00
+*** SUMMARY ***
+Total pot $49.50 | Rake $1.00
+Board [8c Ks 3d 6d Qc]
+Seat 0: CC_BB_OOP_vs_CO won ($48.50)
+
+

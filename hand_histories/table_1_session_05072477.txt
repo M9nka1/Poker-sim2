@@ -1,0 +1,31 @@
+PokerStars Hand #175034480364311: Hold'em No Limit ($0.50/$1.00) - 2025/06/19 20:53:23 GMT+03:00 GMT+03:00
+Table 'PioSolver Table' 6-max Seat #5 is the button
+Seat 1: CC_BB_OOP_vs_CO ($100.00 in chips)
+Seat 2: Pio_EP ($100.00 in chips)
+Seat 3: Pio_MP ($100.00 in chips)
+Seat 4: RFI_IP_CO ($100.00 in chips)
+Seat 5: Pio_BTN ($100.00 in chips)
+Seat 6: Pio_SB ($100.00 in chips)
+Pio_SB: posts small blind $0.50
+CC_BB_OOP_vs_CO: posts big blind $1.00
+*** HOLE CARDS ***
+Pio_EP: folds
+Pio_MP: folds
+RFI_IP_CO: raises $1.75 to $2.50
+Pio_BTN: folds
+Pio_SB: folds
+CC_BB_OOP_vs_CO: calls $1.50
+*** FLOP *** [3c Qs 4d]
+CC_BB_OOP_vs_CO: bets $2.75
+RFI_IP_CO: folds
+*** SUMMARY ***
+Total pot $8.25 | Rake $0.41
+Board [3c Qs 4d]
+Seat 1: CC_BB_OOP_vs_CO (big blind) showed [Kc 6c] and won ($7.84)
+Seat 2: Pio_EP folded before Flop (didn't bet)
+Seat 3: Pio_MP folded before Flop (didn't bet)
+Seat 4: RFI_IP_CO folded on the Flop
+Seat 5: Pio_BTN (button) folded before Flop (didn't bet)
+Seat 6: Pio_SB (small blind) folded before Flop
+
+

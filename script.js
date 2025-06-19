@@ -117,10 +117,10 @@ let currentGameSettings = {
       currentWeight: 0,
       handWeights: {}
     },
-    positions: {
-      player1: 'BTN',
-      player2: 'BB'
-    }
+            positions: {
+          player1: 'BTN',
+          player2: 'BB'
+        }
   }
 };
 
@@ -188,6 +188,15 @@ document.addEventListener('DOMContentLoaded', function() {
   // Инициализация range селекторов
   initializeRangeSelector('range-select-player1');
   initializeRangeSelector('range-select-player2');
+  
+  // Инициализация системы анимаций очереди хода
+  initializePlayerTurnAnimations();
+  
+  // Инициализация системы отслеживания раздач в одиночном режиме
+  // Задержка для корректной инициализации
+  setTimeout(() => {
+    initializeSinglePlayerHandTracking();
+  }, 1000);
   
   // Загрузка списков файлов
   loadPreflopSpotsList();
@@ -364,6 +373,7 @@ async function loadPreflopSpot(filePath) {
     
     const content = await response.text();
     state.settings.preflopSpot = content;
+    state.settings.preflopFile = filePath; // Добавляем путь к файлу для сервера
       
     const preview = document.getElementById('preflop-content');
     preview.textContent = content.substring(0, 200) + (content.length > 200 ? '...' : '');
@@ -513,11 +523,14 @@ function handleRankSelection(event) {
   const rank = btn.dataset.rank;
   const rankType = btn.closest('.rank-buttons').dataset.rankType;
   
+  console.log(`🃏 Выбор ранга: ${rank} для типа ${rankType} на улице ${state.ui.currentStreet}`);
+  
   if (rank === 'any') {
     // Сбросить все выборы и выбрать "любой"
     resetRankButtons(btn.closest('.rank-buttons'));
     btn.classList.add('active');
     state.settings.boardSettings[state.ui.currentStreet].ranks[rankType] = ['any'];
+    console.log(`✅ Установлен "любой" ранг для ${rankType}`);
   } else {
     // Убрать "любой" если он был активен
     const anyBtn = btn.closest('.rank-buttons').querySelector('[data-rank="any"]');
@@ -537,19 +550,27 @@ function handleRankSelection(event) {
       if (!currentRanks.includes(rank)) {
         currentRanks.push(rank);
       }
+      console.log(`✅ Добавлен ранг ${rank} для ${rankType}`);
     } else {
       const index = currentRanks.indexOf(rank);
       if (index > -1) {
         currentRanks.splice(index, 1);
       }
+      console.log(`❌ Удален ранг ${rank} для ${rankType}`);
     }
     
     // Если ничего не выбрано, вернуть "любой"
     if (currentRanks.length === 0) {
       anyBtn.classList.add('active');
       state.settings.boardSettings[state.ui.currentStreet].ranks[rankType] = ['any'];
+      console.log(`🔄 Возвращен "любой" ранг для ${rankType} (ничего не выбрано)`);
     }
   }
+  
+  console.log(`🎯 Текущие ранги для ${rankType}:`, state.settings.boardSettings[state.ui.currentStreet].ranks[rankType]);
+  
+  // Синхронизировать настройки после изменения
+  syncGameSettings();
 }
 
 function startRankDrag(event) {
@@ -1160,15 +1181,13 @@ function createPokerTable(tableNumber) {
     <div class="table-felt">
       <!-- Верхний ряд игроков -->
       <div class="players-top table-row">
-        <div class="player-seat seat-1 position-${state.settings.playerRanges.positions?.player1?.toLowerCase() || 'btn'} center-aligned">
+        <div class="player-seat seat-1 position-${getDisplayPosition(state.settings.playerRanges.positions?.player1)?.toLowerCase() || 'btn'} center-aligned">
           <div class="player-avatar">
             <i class="fas fa-user"></i>
           </div>
-          <div class="player-info">
+          <div class="player-info-horizontal">
             <div class="player-name">Игрок 1</div>
-          </div>
-          <div class="position-stack-box">
-            <div class="player-position">${state.settings.playerRanges.positions?.player1 || 'BTN'}</div>
+            <div class="player-position">${getDisplayPosition(state.settings.playerRanges.positions?.player1) || 'BTN'}</div>
             <div class="player-stack">$1000</div>
           </div>
           <div class="player-cards center-aligned">
@@ -1206,7 +1225,7 @@ function createPokerTable(tableNumber) {
       
       <!-- Нижний ряд игроков -->
       <div class="players-bottom table-row">
-        <div class="player-seat seat-2 position-${state.settings.playerRanges.positions?.player2?.toLowerCase() || 'bb'} center-aligned">
+        <div class="player-seat seat-2 position-${getDisplayPosition(state.settings.playerRanges.positions?.player2)?.toLowerCase() || 'bb'} center-aligned">
           <div class="player-action center-aligned">
             <span class="action-text">Ожидание...</span>
             <span class="bet-amount">$0</span>
@@ -1215,11 +1234,9 @@ function createPokerTable(tableNumber) {
             <div class="card-slot hole-card">?</div>
             <div class="card-slot hole-card">?</div>
           </div>
-          <div class="player-info">
+          <div class="player-info-horizontal">
             <div class="player-name">Игрок 2</div>
-          </div>
-          <div class="position-stack-box">
-            <div class="player-position">${state.settings.playerRanges.positions?.player2 || 'BB'}</div>
+            <div class="player-position">${getDisplayPosition(state.settings.playerRanges.positions?.player2) || 'BB'}</div>
             <div class="player-stack">$1000</div>
           </div>
           <div class="player-avatar">
@@ -1232,8 +1249,11 @@ function createPokerTable(tableNumber) {
       <div class="position-stack-row table-row">
         <div class="position-stack-element center-aligned">
           <div class="position-stack-box-bottom">
-            <div class="player-position-bottom">${state.settings.playerRanges.positions?.player2 || 'BB'}</div>
-            <div class="player-stack-bottom">$1000</div>
+            <div class="hero-info-horizontal">
+              <div class="player-name-bottom">Герой</div>
+              <div class="player-position-bottom">${getDisplayPosition(state.settings.playerRanges.positions?.player2) || 'BB'}</div>
+              <div class="player-stack-bottom">$1000</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1306,6 +1326,14 @@ function createPokerTable(tableNumber) {
   `;
   
   return table;
+}
+
+// ===== ПОЗИЦИИ =====
+function getDisplayPosition(position) {
+  // Преобразует позиции IP/OOP в BTN/BB для отображения
+  if (position === 'IP') return 'BTN';
+  if (position === 'OOP') return 'BB';
+  return position; // Возвращает исходную позицию если нет преобразования
 }
 
 // ===== УВЕДОМЛЕНИЯ =====
@@ -1591,10 +1619,160 @@ function addTableStyles() {
       color: white;
     }
     
+    .player-info-horizontal {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-align: center;
+      color: white;
+      flex-wrap: wrap;
+    }
+    
+    .hero-info-horizontal {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-align: center;
+      flex-wrap: wrap;
+    }
+    
+    /* Специфичные стили для горизонтального отображения элементов */
+    .player-info-horizontal .player-name,
+    .player-info-horizontal .player-position, 
+    .player-info-horizontal .player-stack {
+      margin: 0 !important;
+      margin-bottom: 0 !important;
+      display: inline-block !important;
+    }
+    
+    .hero-info-horizontal .player-name-bottom,
+    .hero-info-horizontal .player-position-bottom,
+    .hero-info-horizontal .player-stack-bottom {
+      margin: 0 !important;
+      margin-bottom: 0 !important;
+      display: inline-block !important;
+    }
+    
+    /* Разделители между элементами */
+    .player-info-horizontal .player-name::after,
+    .player-info-horizontal .player-position::after {
+      content: " | ";
+      color: rgba(255, 255, 255, 0.6);
+      margin: 0 4px;
+    }
+    
+    .hero-info-horizontal .player-name-bottom::after,
+    .hero-info-horizontal .player-position-bottom::after {
+      content: " | ";
+      color: rgba(255, 255, 255, 0.6);
+      margin: 0 4px;
+    }
+
+    /* Область героя */
+    .hero-area {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      margin: 15px auto 0 auto;
+      width: 100%;
+      max-width: 800px;
+      position: relative;
+    }
+
+    /* Блок игрока-героя с зеленым фоном */
+    .player-section.hero-green {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 10px;
+      border: 2px solid rgba(74, 222, 128, 0.5);
+      background: rgba(74, 222, 128, 0.1);
+      backdrop-filter: blur(5px);
+      transition: all 0.3s ease;
+      position: relative;
+      min-width: 180px;
+      width: 220px;
+    }
+
+    .player-info-horizontal-green {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-align: center;
+      color: white;
+      flex-wrap: wrap;
+      font-weight: bold;
+      width: fit-content;
+      margin: 0 auto;
+    }
+
+    /* Специфичные стили для зеленого блока */
+    .player-info-horizontal-green .player-name,
+    .player-info-horizontal-green .player-position, 
+    .player-info-horizontal-green .player-stack {
+      margin: 0 !important;
+      margin-bottom: 0 !important;
+      display: inline-block !important;
+      color: white;
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+
+    /* Разделители для зеленого блока героя */
+    .player-info-horizontal-green .player-name::after,
+    .player-info-horizontal-green .player-position::after {
+      content: " | ";
+      color: rgba(255, 255, 255, 0.8);
+      font-weight: normal;
+    }
+
+    .hero-area .actions-right {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 220px;
+    }
+
+    .hero-area .actions-right .table-actions {
+      width: auto;
+      min-width: 300px;
+      max-width: 400px;
+      display: flex !important;
+      flex-direction: column !important;
+      flex-wrap: nowrap;
+      gap: 6px;
+      justify-content: center;
+      align-items: center;
+      padding: 8px;
+      background: rgba(74, 222, 128, 0.05);
+      border-radius: 6px;
+      border: 1px solid rgba(74, 222, 128, 0.2);
+    }
+    
     .player-name {
       font-weight: bold;
       font-size: 0.9rem;
       margin-bottom: 2px;
+    }
+    
+    .player-name-bottom {
+      font-weight: bold;
+      font-size: 0.85rem;
+      color: white;
+      margin-right: 4px;
     }
     
     /* ===== ЗЕЛЕНЫЙ БОКС ПОЗИЦИИ И СТЕКА ===== */
@@ -2264,9 +2442,15 @@ function initializePositionButtons() {
     };
   }
   
-  // Инициализировать активные кнопки по умолчанию
-  document.querySelectorAll('[data-player="1"][data-position="BTN"]').forEach(btn => btn.classList.add('active'));
-  document.querySelectorAll('[data-player="2"][data-position="BB"]').forEach(btn => btn.classList.add('active'));
+  // ✅ ИСПРАВЛЕНИЕ: Инициализировать активные кнопки на основе реальных настроек
+  const player1Position = state.settings.playerRanges.positions.player1 || 'BTN';
+  const player2Position = state.settings.playerRanges.positions.player2 || 'BB';
+  
+  // Активируем кнопки для конкретных позиций (BTN, BB, EP, MP, CO, SB)
+  document.querySelectorAll(`[data-player="1"][data-position="${player1Position}"]`).forEach(btn => btn.classList.add('active'));
+  document.querySelectorAll(`[data-player="2"][data-position="${player2Position}"]`).forEach(btn => btn.classList.add('active'));
+  
+  console.log(`🎯 Инициализация позиций: Player1=${player1Position}, Player2=${player2Position}`);
   
   // Обработчики для детальных позиций (EP/MP/CO/BTN/SB/BB)
   positionBtns.forEach(btn => {
@@ -2317,11 +2501,10 @@ function initializePositionButtons() {
         state.settings.playerRanges.positions = {};
       }
       
-      // Обновляем настройки - упрощенная логика для IP/OOP
-      const simplifiedPosition = position === 'IP' ? 'BTN' : 'BB'; // IP = BTN, OOP = BB
-      state.settings.playerRanges.positions[`player${player}`] = simplifiedPosition;
+      // Обновляем настройки - сохраняем исходные позиции IP/OOP
+      state.settings.playerRanges.positions[`player${player}`] = position;
       
-      console.log('🎯 IP/OOP позиция обновлена:', `player${player}`, '=', position, '(', simplifiedPosition, ')');
+      console.log('🎯 IP/OOP позиция обновлена:', `player${player}`, '=', position);
       console.log('🎯 Все позиции:', state.settings.playerRanges.positions);
       
       // Сохранить настройки
@@ -2346,6 +2529,8 @@ function syncGameSettings() {
   };
   
   console.log('🔄 Настройки синхронизированы:', currentGameSettings);
+  console.log('🃏 Настройки карт флопа:', currentGameSettings.boardSettings?.flop);
+  console.log('🎯 Позиции игроков:', currentGameSettings.playerRanges?.positions);
 }
 
 // Тестовая функция для демонстрации парсинга
@@ -3029,3 +3214,583 @@ if (typeof window !== 'undefined') {
   window.testUserExample = testUserExample;
   window.testUserSpecificExample = testUserSpecificExample;
 } 
+
+// ===== АНИМАЦИИ ОЧЕРЕДИ ХОДА =====
+
+function setActivePlayerTurn(playerNumber) {
+  // Убираем анимацию у всех игроков
+  clearAllPlayerTurnAnimations();
+  
+  console.log(`🎬 Установка анимации очереди хода для игрока ${playerNumber}`);
+  
+  if (playerNumber === 1) {
+    // Верхний игрок (Игрок 1)
+    const playerSeat = document.querySelector('.player-seat.seat-1');
+    if (playerSeat) {
+      playerSeat.classList.add('active-turn');
+      console.log('🎬 Анимация активирована для верхнего игрока');
+    }
+  } else if (playerNumber === 2) {
+    // Нижний игрок (Игрок 2 / Герой)
+    const heroSection = document.querySelector('.player-section.hero-green');
+    const playerSeat = document.querySelector('.player-seat.seat-2');
+    
+    if (heroSection) {
+      heroSection.classList.add('active-turn');
+      console.log('🎬 Анимация активирована для героя (зеленый блок)');
+    } else if (playerSeat) {
+      playerSeat.classList.add('active-turn');
+      console.log('🎬 Анимация активирована для нижнего игрока');
+    }
+  }
+}
+
+function clearAllPlayerTurnAnimations() {
+  // Убираем анимацию у всех возможных контейнеров игроков
+  const containers = document.querySelectorAll(
+    '.player-seat.active-turn, .opponent-area-compact.active-turn, .player-section.hero-green.active-turn'
+  );
+  
+  containers.forEach(container => {
+    container.classList.remove('active-turn');
+  });
+  
+  console.log(`🎬 Очищены анимации очереди хода (${containers.length} контейнеров)`);
+}
+
+function updatePlayerTurnAnimations() {
+  console.log('🎬 Обновление анимаций очереди хода для всех столов');
+  
+  // Очищаем все анимации
+  clearAllPlayerTurnAnimations();
+  
+  // Проверяем все столы
+  const tables = document.querySelectorAll('.poker-table');
+  
+  tables.forEach((table, index) => {
+    const tableNumber = index + 1;
+    console.log(`🎬 Проверка стола ${tableNumber}`);
+    
+    // Ищем активные кнопки действий на этом столе
+    const activeButtons = table.querySelectorAll('.action-btn:not([disabled])');
+    const hasActiveButtons = activeButtons.length > 0;
+    
+    console.log(`🎬 Стол ${tableNumber}: найдено ${activeButtons.length} активных кнопок`, 
+      Array.from(activeButtons).map(btn => btn.textContent.trim()));
+    
+    if (hasActiveButtons) {
+      // Если есть активные кнопки - ход игрока (героя)
+      setActivePlayerTurnForTable(table, 2); // 2 = герой/нижний игрок
+    }
+  });
+}
+
+function setActivePlayerTurnForTable(tableElement, playerNumber) {
+  const tableIndex = Array.from(document.querySelectorAll('.poker-table')).indexOf(tableElement) + 1;
+  console.log(`🎬 Установка анимации очереди хода для игрока ${playerNumber} на столе ${tableIndex}`);
+  
+  if (playerNumber === 1) {
+    // Верхний игрок (Игрок 1)
+    const playerSeat = tableElement.querySelector('.player-seat.seat-1');
+    if (playerSeat) {
+      playerSeat.classList.add('active-turn');
+      console.log(`🎬 Анимация активирована для верхнего игрока на столе ${tableIndex}`);
+    }
+  } else if (playerNumber === 2) {
+    // Нижний игрок (Игрок 2 / Герой)
+    let animationAdded = false;
+    
+    // Пытаемся найти зеленый блок героя
+    const heroSection = tableElement.querySelector('.player-section.hero-green');
+    if (heroSection) {
+      heroSection.classList.add('active-turn');
+      console.log(`🎬 Анимация активирована для героя (зеленый блок) на столе ${tableIndex}`);
+      animationAdded = true;
+    }
+    
+    // Если зеленого блока нет, ищем обычное место игрока
+    if (!animationAdded) {
+      const playerSeat = tableElement.querySelector('.player-seat.seat-2');
+      if (playerSeat) {
+        playerSeat.classList.add('active-turn');
+        console.log(`🎬 Анимация активирована для нижнего игрока на столе ${tableIndex}`);
+        animationAdded = true;
+      }
+    }
+    
+    // Если ничего не найдено, пробуем другие варианты
+    if (!animationAdded) {
+      const heroBox = tableElement.querySelector('.position-stack-box-bottom');
+      if (heroBox) {
+        heroBox.classList.add('active-turn');
+        console.log(`🎬 Анимация активирована для бокса героя на столе ${tableIndex}`);
+        animationAdded = true;
+      }
+    }
+    
+    if (!animationAdded) {
+      console.log(`⚠️ Не удалось найти контейнер для героя на столе ${tableIndex}`);
+    }
+  }
+}
+
+function checkIfPlayer1Turn() {
+  // В текущей реализации игрок 1 (верхний) не имеет кнопок управления
+  // Это ИИ или оппонент в мультиплеере
+  return false;
+}
+
+function checkIfPlayer2Turn() {
+  // Проверяем есть ли активные кнопки действий на любом столе
+  const activeButtons = document.querySelectorAll('.action-btn:not([disabled])');
+  const hasActiveButtons = activeButtons.length > 0;
+  
+  console.log(`🎬 Проверка хода игрока 2: найдено ${activeButtons.length} активных кнопок`);
+  return hasActiveButtons;
+}
+
+// Демонстрационная функция для тестирования анимаций
+function testPlayerTurnAnimations() {
+  console.log('🎬 Тестирование анимаций очереди хода...');
+  
+  // Проверяем сколько столов есть в DOM
+  const tables = document.querySelectorAll('.poker-table');
+  console.log(`🎬 Найдено столов: ${tables.length}`);
+  
+  if (tables.length === 0) {
+    console.log('⚠️ Столы не найдены. Создайте столы сначала.');
+    return;
+  }
+  
+  // Тест 1: Проверка текущего состояния
+  console.log('🎬 Тест 1: Проверка текущего состояния кнопок');
+  updatePlayerTurnAnimations();
+  
+  // Тест 2: Ручная активация анимации для первого стола
+  setTimeout(() => {
+    console.log('🎬 Тест 2: Ручная активация анимации для первого стола');
+    if (tables[0]) {
+      setActivePlayerTurnForTable(tables[0], 2);
+    }
+  }, 2000);
+  
+  // Тест 3: Проверка всех столов
+  setTimeout(() => {
+    console.log('🎬 Тест 3: Проверка всех столов');
+    tables.forEach((table, index) => {
+      const activeButtons = table.querySelectorAll('.action-btn:not([disabled])');
+      console.log(`Стол ${index + 1}: ${activeButtons.length} активных кнопок`);
+      if (activeButtons.length > 0) {
+        setActivePlayerTurnForTable(table, 2);
+      }
+    });
+  }, 4000);
+  
+  // Тест 4: Очистка анимаций
+  setTimeout(() => {
+    console.log('🎬 Тест 4: Очистка анимаций');
+    clearAllPlayerTurnAnimations();
+  }, 7000);
+  
+  // Тест 5: Финальная проверка автоматической системы
+  setTimeout(() => {
+    console.log('🎬 Тест 5: Финальная проверка автоматической системы');
+    updatePlayerTurnAnimations();
+  }, 8000);
+}
+
+// Автоматическое обновление анимаций при изменении DOM
+const playerTurnObserver = new MutationObserver((mutations) => {
+  let shouldUpdate = false;
+  
+  mutations.forEach((mutation) => {
+    // Проверяем изменения в кнопках действий
+    if (mutation.type === 'attributes' && mutation.attributeName === 'disabled') {
+      const target = mutation.target;
+      if (target.matches('.action-btn')) {
+        console.log(`🎬 Изменение состояния кнопки: ${target.textContent.trim()}, disabled: ${target.disabled}`);
+        shouldUpdate = true;
+      }
+    }
+    
+    // Проверяем добавление/удаление элементов (новые столы, кнопки)
+    if (mutation.type === 'childList') {
+      const addedNodes = Array.from(mutation.addedNodes);
+      const removedNodes = Array.from(mutation.removedNodes);
+      
+      const hasRelevantChanges = [...addedNodes, ...removedNodes].some(node => {
+        if (node.nodeType === 1) { // Element node
+          return node.matches('.poker-table') || 
+                 node.matches('.action-btn') || 
+                 node.querySelector && node.querySelector('.action-btn');
+        }
+        return false;
+      });
+      
+      if (hasRelevantChanges) {
+        console.log('🎬 Изменения в DOM: добавлены/удалены столы или кнопки');
+        shouldUpdate = true;
+      }
+    }
+  });
+  
+  if (shouldUpdate) {
+    // Обновляем анимации с небольшой задержкой
+    setTimeout(updatePlayerTurnAnimations, 150);
+  }
+});
+
+// Инициализация наблюдателя
+function initializePlayerTurnAnimations() {
+  console.log('🎬 Инициализация системы анимаций очереди хода');
+  
+  // Начинаем наблюдение за изменениями в DOM
+  const targetNode = document.body;
+  const config = { 
+    attributes: true, 
+    childList: true, 
+    subtree: true, 
+    attributeFilter: ['disabled', 'class'] 
+  };
+  
+  playerTurnObserver.observe(targetNode, config);
+  
+  // Добавляем обработчики для кнопок действий
+  document.addEventListener('click', (event) => {
+    if (event.target.matches('.action-btn')) {
+      console.log(`🎬 Клик по кнопке действия: ${event.target.textContent.trim()}`);
+      // После действия обновляем анимации
+      setTimeout(updatePlayerTurnAnimations, 200);
+    }
+  });
+  
+  // Дополнительное отслеживание изменений кнопок
+  document.addEventListener('DOMNodeInserted', (event) => {
+    if (event.target.matches && event.target.matches('.poker-table')) {
+      console.log('🎬 Новый стол добавлен в DOM');
+      setTimeout(updatePlayerTurnAnimations, 300);
+    }
+  });
+  
+  // Периодическое обновление анимаций (резервный механизм)
+  setInterval(() => {
+    const hasActiveTables = document.querySelectorAll('.poker-table').length > 0;
+    if (hasActiveTables) {
+      updatePlayerTurnAnimations();
+    }
+  }, 5000); // Каждые 5 секунд
+  
+  console.log('🎬 Система анимаций очереди хода инициализирована');
+}
+
+// Для тестирования в консоли разработчика
+if (typeof window !== 'undefined') {
+  window.testPlayerTurnAnimations = testPlayerTurnAnimations;
+  window.setActivePlayerTurn = setActivePlayerTurn;
+  window.clearAllPlayerTurnAnimations = clearAllPlayerTurnAnimations;
+  window.simulatePlayerTurn = simulatePlayerTurn;
+  window.simulatePlayerActionComplete = simulatePlayerActionComplete;
+  window.fullAnimationDemo = fullAnimationDemo;
+  window.updatePlayerTurnAnimations = updatePlayerTurnAnimations;
+} 
+
+// Функция для тестирования активации кнопок (имитация начала хода)
+function simulatePlayerTurn(tableIndex = 1) {
+  console.log(`🎮 Имитация начала хода игрока на столе ${tableIndex}`);
+  
+  const tables = document.querySelectorAll('.poker-table');
+  const table = tables[tableIndex - 1];
+  
+  if (!table) {
+    console.log(`⚠️ Стол ${tableIndex} не найден`);
+    return;
+  }
+  
+  // Активируем кнопки действий на этом столе
+  const actionButtons = table.querySelectorAll('.action-btn');
+  actionButtons.forEach(btn => {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.pointerEvents = 'auto';
+  });
+  
+  console.log(`✅ Активированы кнопки на столе ${tableIndex}:`, 
+    Array.from(actionButtons).map(btn => btn.textContent.trim()));
+  
+  // Обновляем анимации
+  setTimeout(updatePlayerTurnAnimations, 100);
+}
+
+// Функция для тестирования деактивации кнопок (имитация конца хода)
+function simulatePlayerActionComplete(tableIndex = 1) {
+  console.log(`🎯 Имитация завершения хода игрока на столе ${tableIndex}`);
+  
+  const tables = document.querySelectorAll('.poker-table');
+  const table = tables[tableIndex - 1];
+  
+  if (!table) {
+    console.log(`⚠️ Стол ${tableIndex} не найден`);
+    return;
+  }
+  
+  // Деактивируем кнопки действий на этом столе
+  const actionButtons = table.querySelectorAll('.action-btn');
+  actionButtons.forEach(btn => {
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.style.pointerEvents = 'none';
+  });
+  
+  console.log(`❌ Деактивированы кнопки на столе ${tableIndex}`);
+  
+  // Обновляем анимации
+  setTimeout(updatePlayerTurnAnimations, 100);
+}
+
+// Полная демонстрация системы анимаций
+function fullAnimationDemo() {
+  console.log('🎪 Запуск полной демонстрации системы анимаций');
+  
+  const tables = document.querySelectorAll('.poker-table');
+  if (tables.length === 0) {
+    console.log('⚠️ Столы не найдены. Создайте столы сначала.');
+    return;
+  }
+  
+  console.log(`🎯 Будет продемонстрирована работа на ${tables.length} столах`);
+  
+  let currentStep = 0;
+  const steps = [
+    () => {
+      console.log('📍 Шаг 1: Очищаем все анимации');
+      clearAllPlayerTurnAnimations();
+    },
+    () => {
+      console.log('📍 Шаг 2: Активируем кнопки на столе 1');
+      simulatePlayerTurn(1);
+    },
+    () => {
+      console.log('📍 Шаг 3: Активируем кнопки на всех столах');
+      tables.forEach((_, index) => simulatePlayerTurn(index + 1));
+    },
+    () => {
+      console.log('📍 Шаг 4: Деактивируем кнопки на столе 1');
+      simulatePlayerActionComplete(1);
+    },
+    () => {
+      console.log('📍 Шаг 5: Деактивируем кнопки на всех столах');
+      tables.forEach((_, index) => simulatePlayerActionComplete(index + 1));
+    },
+    () => {
+      console.log('📍 Шаг 6: Финальная проверка (должны быть очищены все анимации)');
+      updatePlayerTurnAnimations();
+      console.log('✅ Демонстрация завершена!');
+    }
+  ];
+  
+  function runNextStep() {
+    if (currentStep < steps.length) {
+      steps[currentStep]();
+      currentStep++;
+      setTimeout(runNextStep, 2000);
+    }
+  }
+  
+  runNextStep();
+}
+
+// ===== СИСТЕМА СЧЕТЧИКА РАЗДАЧ ДЛЯ ОДИНОЧНОГО РЕЖИМА =====
+
+// Функция для симуляции завершения раздачи в одиночном режиме
+async function handleSinglePlayerHandCompleted(tableElement, handData = null) {
+  console.log('🏆 Обработка завершения раздачи в одиночном режиме');
+  
+  // Получить номер стола
+  const tableNumber = Array.from(document.querySelectorAll('.poker-table')).indexOf(tableElement) + 1;
+  
+  // Создать данные раздачи если не переданы
+  if (!handData) {
+    handData = {
+      tableNumber: tableNumber,
+      timestamp: new Date().toISOString(),
+      gameMode: 'single-player',
+      completed: true
+    };
+  }
+  
+  // Уведомить о завершении раздачи для обновления счетчика
+  await notifyHandCompletedForSinglePlayer(tableNumber, handData);
+  
+  // Показать визуальный эффект завершения
+  showHandCompletionEffect(tableElement);
+  
+  // Показать уведомление
+  showNotification('Раздача завершена', 'success');
+}
+
+// Уведомить о завершении раздачи для обновления счетчика в одиночном режиме
+async function notifyHandCompletedForSinglePlayer(tableId, handData) {
+  // Проверяем, что система аутентификации доступна
+  if (typeof authManager !== 'undefined' && authManager && authManager.currentUser) {
+    const result = await authManager.notifyHandCompleted(tableId, handData);
+    if (result) {
+      console.log(`📊 Счетчик раздач обновлен. Осталось: ${result.remaining_hands}`);
+      
+      if (!result.can_continue) {
+        showNotification('Лимит раздач исчерпан! Обратитесь к администратору.', 'error');
+        blockAllTableActions();
+      }
+      
+      return result;
+    }
+  } else {
+    console.log('⚠️ Система аутентификации недоступна или пользователь не авторизован');
+  }
+  return null;
+}
+
+// Показать эффект завершения раздачи
+function showHandCompletionEffect(tableElement) {
+  // Добавить CSS класс для анимации завершения стола (без анимации банка)
+  tableElement.classList.add('hand-completed');
+  
+  // Убрать эффект через 3 секунды
+  setTimeout(() => {
+    tableElement.classList.remove('hand-completed');
+  }, 3000);
+}
+
+// Заблокировать все действия на столах при исчерпании лимита
+function blockAllTableActions() {
+  console.log('🚫 Блокировка всех действий - лимит раздач исчерпан');
+  
+  // Заблокировать все кнопки действий
+  document.querySelectorAll('.action-btn').forEach(btn => {
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+  });
+  
+  // Заблокировать кнопки управления столом
+  document.querySelectorAll('.table-btn').forEach(btn => {
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+  });
+  
+  // Показать предупреждение на всех столах
+  document.querySelectorAll('.poker-table').forEach(table => {
+    showHandLimitWarningOnTable(table);
+  });
+}
+
+// Показать предупреждение о лимите на конкретном столе
+function showHandLimitWarningOnTable(tableElement) {
+  // Убрать существующее предупреждение если есть
+  const existingWarning = tableElement.querySelector('.hand-limit-warning');
+  if (existingWarning) {
+    existingWarning.remove();
+  }
+  
+  // Создать новое предупреждение
+  const warning = document.createElement('div');
+  warning.className = 'hand-limit-warning';
+  warning.innerHTML = `
+    <div class="warning-content">
+      <i class="fas fa-exclamation-triangle"></i>
+      <span>Лимит раздач исчерпан</span>
+      <small>Обратитесь к администратору</small>
+    </div>
+  `;
+  
+  tableElement.appendChild(warning);
+}
+
+// Инициализация обработчиков для одиночного режима
+function initializeSinglePlayerHandTracking() {
+  console.log('🎯 Инициализация отслеживания раздач в одиночном режиме');
+  
+  // Наблюдатель за изменениями DOM для отслеживания завершения раздач
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'childList') {
+        // Проверяем, появились ли новые элементы, указывающие на завершение раздачи
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Ищем индикаторы завершения раздачи
+            if (node.classList && (
+                node.classList.contains('winner-announcement') ||
+                node.classList.contains('hand-result') ||
+                node.textContent.includes('выиграл') ||
+                node.textContent.includes('победил')
+              )) {
+              
+              // Найти родительский стол
+              const tableElement = node.closest('.poker-table');
+              if (tableElement) {
+                console.log('🏆 Обнаружено завершение раздачи через DOM наблюдатель');
+                
+                // Задержка для корректной обработки
+                setTimeout(() => {
+                  handleSinglePlayerHandCompleted(tableElement);
+                }, 1000);
+              }
+            }
+          }
+        });
+      }
+    });
+  });
+  
+  // Запускаем наблюдатель для всех столов
+  document.querySelectorAll('.poker-table').forEach(table => {
+    observer.observe(table, {
+      childList: true,
+      subtree: true
+    });
+  });
+  
+  console.log('✅ Отслеживание завершения раздач в одиночном режиме инициализировано');
+}
+
+// Функция для тестирования системы счетчика
+function testHandCounterSystem() {
+  console.log('🧪 Тестирование системы счетчика раздач');
+  
+  const table = document.querySelector('.poker-table');
+  if (table) {
+    handleSinglePlayerHandCompleted(table, {
+      testMode: true,
+      handNumber: 'TEST-001',
+      winner: 'Тест игрок'
+    });
+  } else {
+    console.log('❌ Стол не найден для тестирования');
+  }
+}
+
+// Глобальные функции для консоли разработчика
+window.testHandCounterSystem = testHandCounterSystem;
+window.handleSinglePlayerHandCompleted = handleSinglePlayerHandCompleted;
+window.blockAllTableActions = blockAllTableActions;
+
+// Функция для демонстрации полной системы
+function fullHandCounterDemo() {
+  console.log('🎭 Полная демонстрация системы счетчика раздач');
+  
+  // Сначала покажем информацию о текущем пользователе
+  if (typeof authManager !== 'undefined' && authManager && authManager.currentUser) {
+    console.log(`👤 Текущий пользователь: ${authManager.currentUser.email}`);
+    console.log(`🎯 Лимит раздач: ${authManager.currentUser.hand_limit}`);
+    
+    // Тестируем завершение раздачи
+    testHandCounterSystem();
+    
+    // Через 5 секунд показываем что изменилось
+    setTimeout(() => {
+      console.log(`🔄 Обновленный лимит: ${authManager.currentUser.hand_limit}`);
+    }, 5000);
+  } else {
+    console.log('❌ Пользователь не авторизован, демонстрация недоступна');
+  }
+}
+
+window.fullHandCounterDemo = fullHandCounterDemo;

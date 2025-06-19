@@ -373,13 +373,14 @@ class PokerTable {
       position = playerIndex === 0 ? 'BTN' : 'BB';
     }
     
-    console.log(`🎯 Игрок ${playerId} (${playerNumber}) получил позицию: ${position}`);
+    console.log(`🎯 Игрок ${playerId} (${playerNumber}) получил позицию из настроек: ${position}`);
     
     this.players.set(playerId, {
       id: playerId,
       name: playerData.name,
       stack: 10000, // $100.00 в центах
       position: position,
+      userDefinedPosition: position, // Сохраняем позицию из настроек пользователя
       cards: [],
       currentBet: 0,
       folded: false,
@@ -577,6 +578,11 @@ class PokerTable {
   }
 
   validateFlopRestrictions(cards, restrictions) {
+    console.log('🔍 Проверка ограничений флопа:', {
+      cards: cards.map(c => c.rank + c.suit),
+      restrictions: restrictions
+    });
+
     // Проверка мастей
     if (restrictions.suits !== 'any') {
       const suits = cards.map(card => card.symbol);
@@ -584,13 +590,22 @@ class PokerTable {
       
       switch (restrictions.suits) {
         case 'monotone':
-          if (uniqueSuits.length !== 1) return false;
+          if (uniqueSuits.length !== 1) {
+            console.log('❌ Не монотон:', uniqueSuits.length, 'мастей');
+            return false;
+          }
           break;
         case 'rainbow':
-          if (uniqueSuits.length !== 3) return false;
+          if (uniqueSuits.length !== 3) {
+            console.log('❌ Не радуга:', uniqueSuits.length, 'мастей');
+            return false;
+          }
           break;
         case 'flush-draw':
-          if (uniqueSuits.length !== 2) return false;
+          if (uniqueSuits.length !== 2) {
+            console.log('❌ Не флеш-дро:', uniqueSuits.length, 'мастей');
+            return false;
+          }
           break;
       }
     }
@@ -602,26 +617,80 @@ class PokerTable {
       
       switch (restrictions.pairing) {
         case 'unpaired':
-          if (uniqueRanks.length !== 3) return false;
+          if (uniqueRanks.length !== 3) {
+            console.log('❌ Не unpaired:', uniqueRanks.length, 'уникальных рангов');
+            return false;
+          }
           break;
         case 'paired':
-          if (uniqueRanks.length !== 2) return false;
+          if (uniqueRanks.length !== 2) {
+            console.log('❌ Не paired:', uniqueRanks.length, 'уникальных рангов');
+            return false;
+          }
           break;
         case 'trips':
-          if (uniqueRanks.length !== 1) return false;
+          if (uniqueRanks.length !== 1) {
+            console.log('❌ Не trips:', uniqueRanks.length, 'уникальных рангов');
+            return false;
+          }
           break;
       }
     }
 
-    // Проверка старшинства карт
-    const sortedRanks = cards.map(card => CARD_RANKS.indexOf(card.rank)).sort((a, b) => a - b);
+    // Проверка старшинства карт - ИСПРАВЛЕНО
+    const rankIndices = cards.map(card => CARD_RANKS.indexOf(card.rank));
+    const sortedRanks = [...rankIndices].sort((a, b) => b - a); // Сортировка по убыванию (от старшей к младшей)
     const [high, middle, low] = [sortedRanks[0], sortedRanks[1], sortedRanks[2]];
     
-    if (restrictions.ranks.high[0] !== 'any') {
+    console.log('🃏 Ранги карт:', {
+      cards: cards.map(c => c.rank),
+      indices: rankIndices,
+      sorted: sortedRanks,
+      high: CARD_RANKS[high],
+      middle: CARD_RANKS[middle], 
+      low: CARD_RANKS[low]
+    });
+    
+    // Проверка высокой карты
+    if (restrictions.ranks.high && restrictions.ranks.high[0] !== 'any') {
       const allowedHighRanks = restrictions.ranks.high.map(rank => CARD_RANKS.indexOf(rank));
-      if (!allowedHighRanks.includes(high)) return false;
+      console.log('🎯 Проверка высокой карты:', {
+        actual: CARD_RANKS[high],
+        allowed: restrictions.ranks.high
+      });
+      if (!allowedHighRanks.includes(high)) {
+        console.log('❌ Высокая карта не подходит');
+        return false;
+      }
+    }
+    
+    // Проверка средней карты
+    if (restrictions.ranks.middle && restrictions.ranks.middle[0] !== 'any') {
+      const allowedMiddleRanks = restrictions.ranks.middle.map(rank => CARD_RANKS.indexOf(rank));
+      console.log('🎯 Проверка средней карты:', {
+        actual: CARD_RANKS[middle],
+        allowed: restrictions.ranks.middle
+      });
+      if (!allowedMiddleRanks.includes(middle)) {
+        console.log('❌ Средняя карта не подходит');
+        return false;
+      }
+    }
+    
+    // Проверка низкой карты
+    if (restrictions.ranks.low && restrictions.ranks.low[0] !== 'any') {
+      const allowedLowRanks = restrictions.ranks.low.map(rank => CARD_RANKS.indexOf(rank));
+      console.log('🎯 Проверка низкой карты:', {
+        actual: CARD_RANKS[low],
+        allowed: restrictions.ranks.low
+      });
+      if (!allowedLowRanks.includes(low)) {
+        console.log('❌ Низкая карта не подходит');
+        return false;
+      }
     }
 
+    console.log('✅ Флоп прошел все проверки');
     return true;
   }
 
@@ -729,47 +798,26 @@ class PokerTable {
       'c3bBU': 'IP'  // Добавляем специальный случай для c3bBU (call 3bet Button)
     };
 
-    // Парсинг строк с информацией о местах игроков
+    // ✅ ИСПРАВЛЕНИЕ: Используем позиции из настроек пользователя, а не из префлоп спота
+    const currentPlayers = Array.from(this.players.values());
+    console.log('=== Информация о позициях игроков (ПОЛЬЗОВАТЕЛЬСКИЕ НАСТРОЙКИ) ===');
+    
+    currentPlayers.forEach(player => {
+      const userPosition = player.userDefinedPosition || player.position;
+      const postflopStatus = positionMap[userPosition] || 'Unknown';
+      
+      this.playerPositions.push({
+        name: player.name,
+        position: userPosition,
+        postflopStatus: postflopStatus
+      });
+      
+      console.log(`Игрок: ${player.name}, Позиция: ${userPosition}, Постфлоп статус: ${postflopStatus}`);
+    });
+    
+    // Дополнительно парсим префлоп спот для получения других данных (банки, ставки и т.д.)
     const seatLines = this.preflopSpot.split('\r\n').filter(line => line.startsWith('Seat '));
-    seatLines.forEach(line => {
-      const seatMatch = line.match(/Seat \d+: ([^\s]+) \(\$[0-9.]+ in chips\)/);
-      if (seatMatch) {
-        let playerName = seatMatch[1];
-        let position = 'Unknown';
-        let postflopStatus = 'Unknown';
-
-        // Определение позиции из имени игрока (если она закодирована в имени)
-        if (playerName.includes('_')) {
-          const parts = playerName.split('_');
-          for (const part of parts) {
-            const upperPart = part.toUpperCase();
-            if (['SB', 'BB', 'EP', 'MP', 'CO', 'BU', 'BTN'].includes(upperPart)) {
-              position = upperPart;
-              postflopStatus = positionMap[upperPart] || 'Unknown';
-              break;
-            }
-            // Проверяем специальные случаи как c3bBU (call 3bet Button)
-            if (part.includes('BU') || part.includes('BTN')) {
-              position = 'BTN';
-              postflopStatus = 'IP';
-              break;
-            }
-          }
-        }
-
-        this.playerPositions.push({
-          name: playerName,
-          position: position,
-          postflopStatus: postflopStatus
-        });
-      }
-    });
-
-    // Вывод информации о позициях в консоль
-    console.log('=== Информация о позициях игроков ===');
-    this.playerPositions.forEach(player => {
-      console.log(`Игрок: ${player.name}, Позиция: ${player.position}, Постфлоп статус: ${player.postflopStatus}`);
-    });
+    console.log(`📊 Найдено ${seatLines.length} игроков в префлоп споте, но используем ${currentPlayers.length} игроков из настроек`);
     console.log('=====================================');
 
     const text = this.preflopSpot;
@@ -1881,17 +1929,17 @@ class PokerTable {
     // Извлекаем информацию о местах из префлоп спота
     const seatMatches = Array.from(this.preflopSpot.matchAll(/Seat (\d+): ([^(]+) \([^)]+\)/g));
     
-    // Определяем кто участвовал в раздаче (дошел до флопа)
-    const playersWhoReachedFlop = [];
-    
-    // Проверяем кто из реальных игроков участвовал
-    Array.from(this.players.values()).forEach(player => {
-      playersWhoReachedFlop.push(player.name);
-    });
+    // DEBUG: Логируем информацию для отладки
+    console.log('🔍 DEBUG generateSummarySeats:');
+    console.log('  seatMatches:', seatMatches.map(m => `Seat ${m[1]}: ${m[2].trim()}`));
+    console.log('  activePlayers:', activePlayers.map(p => `${p.name} (folded: ${p.folded})`));
+    console.log('  winner:', winner ? winner.name : 'none');
     
     seatMatches.forEach(match => {
       const seatNumber = match[1];
       const playerName = match[2].trim();
+      
+      console.log(`\n  🎯 Обрабатываем Seat ${seatNumber}: ${playerName}`);
       
       // Определяем позицию
       let position = '';
@@ -1905,26 +1953,48 @@ class PokerTable {
       
       // Определяем что случилось с игроком
       const player = Array.from(this.players.values()).find(p => p.name === playerName);
+      console.log(`    Найден в this.players:`, player ? `${player.name} (folded: ${player.folded})` : 'НЕТ');
       
       if (player) {
         // Это один из реальных игроков, участвующих в раздаче
         if (player.folded) {
           // Игрок сфолдил во время постфлоп игры
+          console.log(`    ✅ Игрок сфолдил на постфлопе`);
           summaryText += `Seat ${seatNumber}: ${playerName}${position} folded on the Flop\n`;
         } else if (activePlayers.includes(player)) {
           // Игрок дошел до конца
           if (player.id === winner.id) {
+            console.log(`    ✅ Игрок ВЫИГРАЛ`);
             const rakeAmount = this.calculateRake();
             const winAmount = this.pot - rakeAmount;
             const handDescription = this.getHandDescription(player.cards);
             summaryText += `Seat ${seatNumber}: ${playerName}${position} showed [${player.cards.map(c => this.formatCard(c)).join(' ')}] and won ($${(winAmount / 100).toFixed(2)}) with ${handDescription}\n`;
           } else {
+            console.log(`    ✅ Игрок проиграл но дошел до конца`);
             const handDescription = this.getHandDescription(player.cards);
             summaryText += `Seat ${seatNumber}: ${playerName}${position} showed [${player.cards.map(c => this.formatCard(c)).join(' ')}] and lost with ${handDescription}\n`;
+          }
+        } else {
+          // ✅ ИСПРАВЛЕНИЕ: Добавляем обработку игроков которые фолдили но не помечены как folded
+          console.log(`    ⚠️ Игрок найден но не в activePlayers и не folded - вероятно фолдил`);
+          
+          // Проверяем действия игрока в истории раздачи
+          const playerActions = this.currentHandHistory?.actions?.filter(a => a.playerName === playerName) || [];
+          const hasFoldAction = playerActions.some(a => a.action === 'fold');
+          
+          if (hasFoldAction) {
+            // Определяем на какой улице сфолдил
+            const foldAction = playerActions.find(a => a.action === 'fold');
+            const streetName = foldAction.street.charAt(0).toUpperCase() + foldAction.street.slice(1);
+            summaryText += `Seat ${seatNumber}: ${playerName}${position} folded on the ${streetName}\n`;
+          } else {
+            // Если нет явного fold action, но игрок не активен - скорее всего фолдил на флопе
+            summaryText += `Seat ${seatNumber}: ${playerName}${position} folded on the Flop\n`;
           }
         }
       } else {
         // Это игрок из префлоп спота, который не участвует в постфлоп игре
+        console.log(`    ❌ Игрок НЕ найден в активных игроках - фолдил на префлопе`);
         if (this.preflopSpot.includes(`${playerName}: folds`) && !this.preflopSpot.includes(`${playerName}: posts`)) {
           summaryText += `Seat ${seatNumber}: ${playerName}${position} folded before Flop (didn't bet)\n`;
         } else {
@@ -1933,6 +2003,7 @@ class PokerTable {
       }
     });
     
+    console.log(`  📊 SUMMARY результат:\n${summaryText}`);
     return summaryText;
   }
 
@@ -2083,7 +2154,7 @@ io.on('connection', (socket) => {
       }
     }
     
-    // Извлечение и отображение информации о позициях игроков, дошедших до флопа
+    // ✅ ИСПРАВЛЕНИЕ: Используем позиции из пользовательских настроек
     const positionMap = {
       'SB': 'OOP',
       'BB': 'OOP',
@@ -2094,45 +2165,76 @@ io.on('connection', (socket) => {
       'BTN': 'IP',
       'c3bBU': 'IP'  // Добавляем специальный случай для c3bBU (call 3bet Button)
     };
-    const seatLines = data.settings.preflopSpot.split('\r\n').filter(line => line.startsWith('Seat '));
+    
+    console.log('🎯 Позиции из настроек пользователя:', data.settings.playerRanges?.positions);
+    
     const playersOnFlop = [];
-
-    // Сначала соберем информацию о всех игроках
-    seatLines.forEach(line => {
-      const seatMatch = line.match(/Seat \d+: ([^\s]+) \(\$[0-9.]+ in chips\)/);
-      if (seatMatch) {
-        let playerName = seatMatch[1];
-        let position = 'Unknown';
-        let postflopStatus = 'Unknown';
-        
-        if (playerName.includes('_')) {
-          const parts = playerName.split('_');
-          for (const part of parts) {
-            const upperPart = part.toUpperCase();
-            if (['SB', 'BB', 'EP', 'MP', 'CO', 'BU', 'BTN'].includes(upperPart)) {
-              position = upperPart;
-              postflopStatus = positionMap[upperPart] || 'Unknown';
-              break;
-            }
-            // Проверяем специальные случаи как c3bBU (call 3bet Button)
-            if (part.includes('BU') || part.includes('BTN')) {
-              position = 'BTN';
-              postflopStatus = 'IP';
-              break;
+    
+    // Используем позиции из настроек пользователя вместо парсинга префлоп спота
+    if (data.settings.playerRanges?.positions) {
+      const userPositions = data.settings.playerRanges.positions;
+      
+      // Player 1
+      const player1Position = userPositions.player1 || 'BTN';
+      const player1Status = positionMap[player1Position] || 'IP';
+      playersOnFlop.push({
+        name: 'Player1',
+        position: player1Position,
+        postflopStatus: player1Status,
+        folded: false
+      });
+      
+      // Player 2
+      const player2Position = userPositions.player2 || 'BB';
+      const player2Status = positionMap[player2Position] || 'OOP';
+      playersOnFlop.push({
+        name: 'Player2',
+        position: player2Position,
+        postflopStatus: player2Status,
+        folded: false
+      });
+      
+      console.log('✅ Игроки на флопе (из настроек):', playersOnFlop);
+    } else {
+      // Fallback: парсим префлоп спот как раньше
+      console.log('⚠️ Позиции из настроек не найдены, парсим префлоп спот');
+      const seatLines = data.settings.preflopSpot.split('\r\n').filter(line => line.startsWith('Seat '));
+      
+      seatLines.forEach(line => {
+        const seatMatch = line.match(/Seat \d+: ([^\s]+) \(\$[0-9.]+ in chips\)/);
+        if (seatMatch) {
+          let playerName = seatMatch[1];
+          let position = 'Unknown';
+          let postflopStatus = 'Unknown';
+          
+          if (playerName.includes('_')) {
+            const parts = playerName.split('_');
+            for (const part of parts) {
+              const upperPart = part.toUpperCase();
+              if (['SB', 'BB', 'EP', 'MP', 'CO', 'BU', 'BTN'].includes(upperPart)) {
+                position = upperPart;
+                postflopStatus = positionMap[upperPart] || 'Unknown';
+                break;
+              }
+              if (part.includes('BU') || part.includes('BTN')) {
+                position = 'BTN';
+                postflopStatus = 'IP';
+                break;
+              }
             }
           }
+          
+          playersOnFlop.push({ 
+            name: playerName, 
+            position: position, 
+            postflopStatus: postflopStatus, 
+            folded: false 
+          });
         }
-        
-        playersOnFlop.push({ 
-          name: playerName, 
-          position: position, 
-          postflopStatus: postflopStatus, 
-          folded: false 
-        });
-      }
-    });
+      });
+    }
 
-    // Теперь проверим, кто сделал фолд на префлопе
+    // Проверим фолды в префлоп споте
     const preflopText = data.settings.preflopSpot;
     const foldActions = preflopText.match(/([^:\r\n]+): folds/g);
     if (foldActions) {

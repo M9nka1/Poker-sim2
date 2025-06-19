@@ -1,0 +1,38 @@
+PokerStars Hand #175016820816011: Hold'em No Limit ($1/$2) - 2025-06-17T13:50:28.720Z
+Table '1' 2-max Seat #2 is the button
+Seat 1: 14 ($86.00 in chips)
+Seat 2: 78 ($86.00 in chips)
+*** FLOP *** [9c Ac 3h]
+14: check
+78: check
+*** TURN *** [6h]
+14: check
+78: check
+*** RIVER *** [6s]
+14: check
+78: check
+*** SUMMARY ***
+Total pot $29.00 | Rake $0.00
+Board [9c Ac 3h 6h 6s]
+Seat 0: Playerundefined won ($29.00)
+
+
+PokerStars Hand #175016823073912: Hold'em No Limit ($1/$2) - 2025-06-17T13:50:54.542Z
+Table '1' 2-max Seat #2 is the button
+Seat 1: 14 ($86.00 in chips)
+Seat 2: 78 ($86.00 in chips)
+*** FLOP *** [3s 8d Qh]
+14: check
+78: check
+*** TURN *** [3c]
+14: check
+78: check
+*** RIVER *** [5h]
+14: check
+78: check
+*** SUMMARY ***
+Total pot $29.00 | Rake $0.00
+Board [3s 8d Qh 3c 5h]
+Seat 0: Playerundefined won ($29.00)
+
+

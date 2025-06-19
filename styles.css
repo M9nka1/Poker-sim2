@@ -1139,20 +1139,23 @@ body {
 .opponent-actions-display,
 .hero-actions-display {
   position: absolute;
-  right: -120px; /* Размещаем справа от контейнера ставок */
+  left: calc(100% + 15px); /* Размещаем справа от игрока с отступом, расширяется вправо */
   top: 50%;
   transform: translateY(-50%);
-  min-width: 100px;
-  max-width: 150px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-family: 'Courier New', monospace; /* Моноширинный шрифт для лучшей читаемости */
+  min-width: 140px;
+  width: auto; /* Автоматическая ширина - контейнер расширяется по содержимому */
+  max-width: none; /* Убираем ограничение максимальной ширины */
+  height: 24px; /* Фиксированная высота для одной строки */
+  padding: 4px 8px; /* Компактные отступы */
+  border-radius: 4px;
+  font-size: 0.65rem; /* Компактный размер шрифта */
+  font-family: 'Courier New', monospace;
   line-height: 1.2;
-  z-index: 15; /* Увеличиваем z-index для видимости */
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  border: 1px solid rgba(255, 255, 255, 0.3); /* Тонкая светлая рамка */
+  z-index: 20;
+  white-space: nowrap; /* Запрещаем перенос строк - все в одну строку */
+  overflow: visible; /* Контейнер расширяется по содержимому */
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .opponent-actions-display {
@@ -1169,22 +1172,51 @@ body {
 
 .actions-text {
   font-weight: 500;
-  font-size: 0.7rem;
-  white-space: pre-wrap; /* Сохраняем переносы строк */
+  font-size: 0.65rem; /* Компактный размер */
+  white-space: nowrap; /* Запрещаем переносы строк - все в одну строку */
+}
+
+/* Цветовое кодирование действий */
+.action-check {
+  color: #22c55e !important; /* Зеленый для Check */
+  font-weight: 600;
+}
+
+.action-bet, .action-raise {
+  color: #3b82f6 !important; /* Синий для Bet/Raise */
+  font-weight: 600;
+}
+
+.action-call {
+  color: #f59e0b !important; /* Оранжевый для Call */
+  font-weight: 600;
+}
+
+.action-fold {
+  color: #ef4444 !important; /* Красный для Fold */
+  font-weight: 600;
+}
+
+.street-separator {
+  color: #fbbf24 !important; /* Яркий желтый цвет для разделителей */
+  font-weight: 700 !important;
+  margin: 0 4px !important;
+  font-size: 0.9em !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
 }
 
 /* Адаптивные стили для контейнеров действий */
 @media (max-width: 1200px) {
   .opponent-actions-display,
   .hero-actions-display {
-    right: -100px;
-    min-width: 80px;
-    max-width: 120px;
-    font-size: 0.7rem;
+    right: -110px; /* Увеличиваем на 10% */
+    min-width: 88px; /* Увеличиваем на 10% */
+    max-width: 132px; /* Увеличиваем на 10% */
+    font-size: 0.75rem; /* Увеличиваем на 10% */
   }
   
   .actions-text {
-    font-size: 0.65rem;
+    font-size: 0.7rem; /* Увеличиваем на 10% */
   }
 }
 
@@ -2053,7 +2085,7 @@ body {
   gap: 15px;
   margin: 15px auto 0 auto; /* Центрируем контейнер по горизонтали */
   width: 100%;
-  max-width: 800px; /* Максимальная ширина для больших экранов */
+  max-width: 600px; /* Уменьшена максимальная ширина так как убрали левый блок */
   position: relative; /* Для абсолютного позиционирования карт */
   left: 0; /* Убираем смещение */
   right: 0; /* Убираем смещение */
@@ -2768,4 +2800,388 @@ body {
 .modal-body {
   padding: 0;
 }
+
+/* ===== ИГРОКИ ===== */
+.players-top, .players-bottom {
+  /* Стили уже определены в .table-row */
+  width: 100%;
+}
+
+.player-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(5px);
+  transition: all 0.3s ease;
+  position: relative;
+  min-width: 180px;
+}
+
+.player-seat.center-aligned {
+  /* Особые стили для центрированных игроков */
+  margin: 0;
+  width: fit-content;
+}
+
+.players-bottom .player-seat {
+  flex-direction: column-reverse;
+}
+
+/* Горизонтальные блоки информации об игроках */
+.player-info-horizontal {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  color: white;
+  flex-wrap: wrap;
+}
+
+.hero-info-horizontal {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  flex-wrap: wrap;
+}
+
+.player-name-bottom {
+  font-weight: bold;
+  font-size: 0.85rem;
+  color: white;
+  margin-right: 4px;
+}
+
+/* Цветовые линии для позиций */
+.player-seat.position-btn { border-color: #ff6b35; }  /* Оранжевый для BTN */
+.player-seat.position-bb { border-color: #4ecdc4; }   /* Бирюзовый для BB */
+.player-seat.position-sb { border-color: #45b7d1; }   /* Синий для SB */
+.player-seat.position-ep { border-color: #f7d794; }   /* Желтый для EP */
+.player-seat.position-mp { border-color: #c44569; }   /* Розовый для MP */
+.player-seat.position-co { border-color: #6c5ce7; }   /* Фиолетовый для CO */
+
+/* Специфичные стили для горизонтального отображения элементов */
+.player-info-horizontal .player-name,
+.player-info-horizontal .player-position, 
+.player-info-horizontal .player-stack {
+  margin: 0 !important;
+  margin-bottom: 0 !important;
+  display: inline-block !important;
+}
+
+.hero-info-horizontal .player-name-bottom,
+.hero-info-horizontal .player-position-bottom,
+.hero-info-horizontal .player-stack-bottom {
+  margin: 0 !important;
+  margin-bottom: 0 !important;
+  display: inline-block !important;
+}
+
+/* Разделители между элементами */
+.player-info-horizontal .player-name::after,
+.player-info-horizontal .player-position::after {
+  content: " | ";
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 4px;
+}
+
+.hero-info-horizontal .player-name-bottom::after,
+.hero-info-horizontal .player-position-bottom::after {
+  content: " | ";
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 4px;
+}
+
+/* Область героя */
+.hero-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin: 15px auto 0 auto;
+  width: 100%;
+  max-width: 800px;
+  position: relative;
+}
+
+/* Блок игрока-героя с зеленым фоном */
+.player-section.hero-green {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 2px solid rgba(74, 222, 128, 0.5);
+  background: rgba(74, 222, 128, 0.1);
+  backdrop-filter: blur(5px);
+  transition: all 0.3s ease;
+  position: relative;
+  min-width: 180px;
+  width: 220px;
+}
+
+.player-info-horizontal-green {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  color: white;
+  flex-wrap: wrap;
+  font-weight: bold;
+  width: fit-content;
+  margin: 0 auto;
+}
+
+/* Специфичные стили для зеленого блока */
+.player-info-horizontal-green .player-name,
+.player-info-horizontal-green .player-position, 
+.player-info-horizontal-green .player-stack {
+  margin: 0 !important;
+  margin-bottom: 0 !important;
+  display: inline-block !important;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+/* Разделители для зеленого блока */
+.player-info-horizontal-green .player-name::after,
+.player-info-horizontal-green .player-position::after {
+  content: " | ";
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: normal;
+}
+
+.hero-area .actions-right {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 220px;
+}
+
+.hero-area .actions-right .table-actions {
+  width: auto;
+  min-width: 300px;
+  max-width: 400px;
+  display: flex !important;
+  flex-direction: column !important;
+  flex-wrap: nowrap;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  padding: 8px;
+  background: rgba(74, 222, 128, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(74, 222, 128, 0.2);
+}
+
+/* ===== АНИМАЦИИ ОЧЕРЕДИ ХОДА ===== */
+
+/* Анимация светящейся точки по контуру прямоугольника */
+@keyframes running-dot-border {
+  0% {
+    top: -4px;
+    left: 8px;
+    transform: translateX(0);
+  }
+  25% {
+    top: -4px;
+    left: calc(100% - 8px);
+    transform: translateX(0);
+  }
+  50% {
+    top: calc(100% + 4px);
+    left: calc(100% - 8px);
+    transform: translateX(0);
+  }
+  75% {
+    top: calc(100% + 4px);
+    left: 8px;
+    transform: translateX(0);
+  }
+  100% {
+    top: -4px;
+    left: 8px;
+    transform: translateX(0);
+  }
+}
+
+/* Базовые стили для контейнеров с анимацией */
+.player-seat.active-turn,
+.opponent-area-compact.active-turn,
+.player-section.hero-green.active-turn,
+.position-stack-box-bottom.active-turn {
+  position: relative;
+  overflow: visible;
+}
+
+/* Светящаяся точка */
+.player-seat.active-turn::before,
+.opponent-area-compact.active-turn::before,
+.player-section.hero-green.active-turn::before,
+.position-stack-box-bottom.active-turn::before {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: radial-gradient(circle, #00ff88 0%, #00ff88 40%, rgba(0, 255, 136, 0.6) 70%, transparent 100%);
+  border-radius: 50%;
+  box-shadow: 
+    0 0 8px #00ff88, 
+    0 0 15px #00ff88, 
+    0 0 25px rgba(0, 255, 136, 0.8),
+    0 0 35px rgba(0, 255, 136, 0.6);
+  z-index: 1000;
+  
+  /* Начальная позиция */
+  top: -4px;
+  left: 8px;
+  
+  animation: running-dot-border 3s linear infinite;
+}
+
+/* Усиленное свечение контейнера во время хода */
+.player-seat.active-turn,
+.opponent-area-compact.active-turn,
+.position-stack-box-bottom.active-turn {
+  border-color: #00ff88 !important;
+  box-shadow: 0 0 15px rgba(0, 255, 136, 0.4), inset 0 0 15px rgba(0, 255, 136, 0.1);
+  animation: glow-pulse 2s ease-in-out infinite alternate;
+}
+
+.player-section.hero-green.active-turn {
+  border-color: #00ff88 !important;
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.5), inset 0 0 20px rgba(0, 255, 136, 0.15);
+  animation: glow-pulse 2s ease-in-out infinite alternate;
+  background: rgba(0, 255, 136, 0.15) !important;
+}
+
+@keyframes glow-pulse {
+  0% {
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.4), inset 0 0 15px rgba(0, 255, 136, 0.1);
+  }
+  100% {
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.6), inset 0 0 25px rgba(0, 255, 136, 0.2);
+  }
+}
+
+/* Стили для мультиплеера */
+.opponent-area-compact.active-turn {
+  background: rgba(0, 255, 136, 0.1) !important;
+}
+
+/* ===== ИГРОКИ ===== */
+
+/* ===== ПРЕДУПРЕЖДЕНИЕ О ЛИМИТЕ РАЗДАЧ ===== */
+.hand-limit-warning {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, rgba(255, 0, 0, 0.95), rgba(200, 0, 0, 0.95));
+  color: white;
+  padding: 20px;
+  border-radius: 15px;
+  text-align: center;
+  z-index: 1000;
+  box-shadow: 0 10px 30px rgba(255, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  animation: handLimitWarningPulse 2s ease-in-out infinite;
+}
+
+.warning-content i {
+  font-size: 24px;
+  margin-bottom: 10px;
+  display: block;
+  animation: warningIconBounce 1s ease-in-out infinite alternate;
+}
+
+.warning-content span {
+  font-size: 16px;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.warning-content small {
+  font-size: 12px;
+  opacity: 0.9;
+  display: block;
+}
+
+@keyframes handLimitWarningPulse {
+  0%, 100% { 
+    box-shadow: 0 10px 30px rgba(255, 0, 0, 0.3);
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% { 
+    box-shadow: 0 15px 40px rgba(255, 0, 0, 0.5);
+    transform: translate(-50%, -50%) scale(1.02);
+  }
+}
+
+@keyframes warningIconBounce {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-3px); }
+}
+
+/* Заблокированные элементы интерфейса */
+.action-btn:disabled,
+.settings-panel input:disabled,
+.settings-panel button:disabled,
+.settings-panel select:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+/* Затемнение заблокированного стола */
+.poker-table:has(.hand-limit-warning) {
+  position: relative;
+}
+
+.poker-table:has(.hand-limit-warning)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 999;
+  pointer-events: none;
+}
+
+/* ===== ЭФФЕКТЫ ЗАВЕРШЕНИЯ РАЗДАЧИ ===== */
+.poker-table.hand-completed {
+  animation: handCompletedGlow 3s ease-in-out;
+}
+
+@keyframes handCompletedGlow {
+  0%, 100% { 
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 40px rgba(34, 197, 94, 0.6);
+  }
+}
+
+/* Анимация банка при завершении раздачи убрана по запросу пользователя */
 

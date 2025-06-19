@@ -279,71 +279,44 @@ class AuthManager {
     }
 
     initializeGameSettings() {
-        // Ждем немного чтобы DOM элементы полностью отрендерились
-        setTimeout(() => {
-            try {
-                console.log('🎯 Инициализация настроек для всех пользователей...');
-                
-                // Принудительно инициализируем все функции настроек для всех пользователей
-                if (typeof generateHandMatrices === 'function') {
-                    console.log('🎯 Инициализация матриц рук...');
-                    generateHandMatrices();
-                } else {
-                    console.warn('⚠️ generateHandMatrices не найдена');
-                }
-                
-                if (typeof updateRangeSliders === 'function') {
-                    updateRangeSliders();
-                } else {
-                    console.warn('⚠️ updateRangeSliders не найдена');
-                }
-                
-                if (typeof initializeEventListeners === 'function') {
-                    console.log('🎮 Инициализация обработчиков событий настроек...');
-                    initializeEventListeners();
-                } else {
-                    console.warn('⚠️ initializeEventListeners не найдена');
-                }
-                
-                if (typeof initializePositionButtons === 'function') {
-                    initializePositionButtons();
-                } else {
-                    console.warn('⚠️ initializePositionButtons не найдена');
-                }
-                
-                if (typeof initializePreflopSelector === 'function') {
-                    initializePreflopSelector();
-                } else {
-                    console.warn('⚠️ initializePreflopSelector не найдена');
-                }
-                
-                if (typeof initializeRangeSelector === 'function') {
-                    initializeRangeSelector('range-select-player1');
-                    initializeRangeSelector('range-select-player2');
-                } else {
-                    console.warn('⚠️ initializeRangeSelector не найдена');
-                }
-                
-                // loadPreflopSpotsList больше не нужно вызывать здесь, 
-                // так как префлоп спот селектор загружает данные при первом клике
-                if (typeof loadPreflopSpotsList === 'function') {
-                    console.log('✅ loadPreflopSpotsList доступна (будет вызвана при необходимости)');
-                } else {
-                    console.warn('⚠️ loadPreflopSpotsList не найдена');
-                }
-                
-                // Убеждаемся что toggleSettingsPanel доступна всем пользователям
-                if (typeof toggleSettingsPanel === 'function') {
-                    console.log('✅ toggleSettingsPanel доступна для всех пользователей');
-                } else {
-                    console.warn('⚠️ toggleSettingsPanel не найдена');
-                }
-                
-                console.log('✅ Настройки игры инициализированы для всех пользователей');
-            } catch (error) {
-                console.error('❌ Ошибка инициализации настроек:', error);
+        console.log('🎮 Инициализация игровых настроек...');
+        
+        // Показываем кнопку скачивания Hand History
+        const downloadBtn = document.getElementById('download-hands-btn');
+        if (downloadBtn) {
+            downloadBtn.style.display = 'inline-block';
+            downloadBtn.addEventListener('click', () => {
+                this.downloadHandHistory();
+            });
+        }
+
+        // Ограничения доступа к игровым функциям на основе лимита раздач
+        this.checkHandLimitAndBlockIfNeeded();
+
+        // Инициализация остальных элементов интерфейса
+        const settingsIcon = document.querySelector('.settings-icon');
+        const adminIcon = document.querySelector('.admin-icon');
+        const sessionIcon = document.querySelector('.session-icon');
+        const userIcon = document.querySelector('.user-icon');
+        const logoutIcon = document.querySelector('.logout-icon');
+
+        if (settingsIcon) settingsIcon.style.display = 'block';
+        if (sessionIcon) sessionIcon.style.display = 'block';
+        if (userIcon) userIcon.style.display = 'block';
+        if (logoutIcon) logoutIcon.style.display = 'block';
+
+        // Показываем админ-панель только для администраторов
+        if (this.currentUser?.roles?.includes('admin')) {
+            if (adminIcon) {
+                adminIcon.style.display = 'block';
+                console.log('👑 Включена административная панель');
             }
-        }, 200);
+        }
+
+        // Обновляем интерфейс пользователя
+        this.updateUserInterface();
+        
+        console.log('✅ Игровые настройки инициализированы');
     }
 
     showLoginForm() {
@@ -389,6 +362,151 @@ class AuthManager {
         document.getElementById('profile-hand-limit').textContent = this.currentUser.hand_limit;
         document.getElementById('profile-created-at').textContent = 
             new Date(this.currentUser.created_at).toLocaleDateString('ru-RU');
+            
+        // Проверка лимита раздач и блокировка игры при достижении нуля
+        this.checkHandLimitAndBlockIfNeeded();
+    }
+
+    // Новый метод для проверки лимита и блокировки игры
+    checkHandLimitAndBlockIfNeeded() {
+        if (this.currentUser.hand_limit <= 0) {
+            this.blockGameInterface();
+            this.showAuthMessage('Лимит раздач исчерпан. Обратитесь к администратору для увеличения лимита.', 'error');
+        } else {
+            this.unblockGameInterface();
+        }
+    }
+
+    // Заблокировать игровой интерфейс
+    blockGameInterface() {
+        console.log('🚫 Блокировка игрового интерфейса - лимит раздач исчерпан');
+        
+        // Заблокировать кнопки действий
+        document.querySelectorAll('.action-btn').forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+        });
+        
+        // Заблокировать настройки игры
+        document.querySelectorAll('.settings-panel input, .settings-panel button, .settings-panel select').forEach(element => {
+            element.disabled = true;
+            element.style.opacity = '0.5';
+        });
+        
+        // Показать уведомление на всех столах
+        document.querySelectorAll('.poker-table').forEach(table => {
+            this.showHandLimitWarning(table);
+        });
+    }
+
+    // Разблокировать игровой интерфейс
+    unblockGameInterface() {
+        console.log('✅ Разблокировка игрового интерфейса');
+        
+        // Разблокировать кнопки действий
+        document.querySelectorAll('.action-btn').forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        });
+        
+        // Разблокировать настройки игры
+        document.querySelectorAll('.settings-panel input, .settings-panel button, .settings-panel select').forEach(element => {
+            element.disabled = false;
+            element.style.opacity = '1';
+        });
+        
+        // Убрать уведомления с столов
+        document.querySelectorAll('.hand-limit-warning').forEach(warning => {
+            warning.remove();
+        });
+    }
+
+    // Показать предупреждение о лимите на столе
+    showHandLimitWarning(tableElement) {
+        // Убрать существующее предупреждение если есть
+        const existingWarning = tableElement.querySelector('.hand-limit-warning');
+        if (existingWarning) {
+            existingWarning.remove();
+        }
+        
+        // Создать новое предупреждение
+        const warning = document.createElement('div');
+        warning.className = 'hand-limit-warning';
+        warning.innerHTML = `
+            <div class="warning-content">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>Лимит раздач исчерпан</span>
+                <small>Обратитесь к администратору</small>
+            </div>
+        `;
+        
+        tableElement.appendChild(warning);
+    }
+
+    // Обновить счетчик раздач после завершения раздачи
+    async updateHandLimit(newLimit) {
+        if (this.currentUser) {
+            this.currentUser.hand_limit = newLimit;
+            this.updateUserInterface();
+            console.log(`📊 Счетчик раздач обновлен: ${newLimit}`);
+        }
+    }
+
+    // API вызов для уведомления о завершении раздачи
+    async notifyHandCompleted(tableId, handData = null) {
+        console.log(`📊 Уведомляем сервер о завершении раздачи на столе ${tableId}`);
+        try {
+            const result = await this.apiRequest('/game/hand-completed', {
+                method: 'POST',
+                body: JSON.stringify({ tableId, handData })
+            });
+            
+            if (result.ok && result.data.data) {
+                const newLimit = result.data.data.newHandLimit;
+                console.log(`✅ Лимит раздач обновлен: ${newLimit}`);
+                await this.updateHandLimit(newLimit);
+            } else {
+                console.error('❌ Ошибка при уведомлении о завершении раздачи:', result.data.message);
+            }
+        } catch (error) {
+            console.error('❌ Ошибка при отправке уведомления о завершении раздачи:', error);
+        }
+    }
+
+    async downloadHandHistory() {
+        console.log('📁 Скачивание Hand History...');
+        try {
+            const sessionId = currentSessionId || Date.now(); // Используем текущий sessionId
+            const response = await fetch(`${this.apiBase}/download-hand-history/${sessionId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${this.accessToken}`
+                },
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `hand_history_session_${sessionId}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                
+                this.showAuthMessage('Hand History скачан успешно!', 'success');
+                console.log('✅ Hand History скачан');
+            } else {
+                const errorData = await response.json();
+                this.showAuthMessage(errorData.error || 'Ошибка скачивания Hand History', 'error');
+                console.error('❌ Ошибка скачивания Hand History:', errorData);
+            }
+        } catch (error) {
+            console.error('❌ Ошибка при скачивании Hand History:', error);
+            this.showAuthMessage('Ошибка скачивания файла', 'error');
+        }
     }
 
     setButtonLoading(button, loading) {

@@ -122,8 +122,8 @@ class MultiplayerClient {
         },
         // Включаем позиции игроков
         positions: state.settings.playerRanges.positions || {
-          player1: 'BTN',
-          player2: 'BB'
+          player1: 'IP',
+          player2: 'OOP'
         }
       }
     };
@@ -223,6 +223,41 @@ class MultiplayerClient {
     this.requestNewHand(tableId);
   }
 
+  // Обновление настроек сессии
+  updateSettings() {
+    if (!this.isConnected || !this.sessionId) {
+      console.log('⚠️ Нет активной сессии для обновления настроек');
+      return;
+    }
+
+    // Преобразовать настройки для отправки на сервер
+    const settingsForServer = {
+      ...state.settings,
+      playerRanges: {
+        player1: {
+          currentWeight: state.settings.playerRanges.player1.currentWeight,
+          handWeights: state.settings.playerRanges.player1.handWeights
+        },
+        player2: {
+          currentWeight: state.settings.playerRanges.player2.currentWeight,
+          handWeights: state.settings.playerRanges.player2.handWeights
+        },
+        // Включаем позиции игроков
+        positions: state.settings.playerRanges.positions || {
+          player1: 'IP',
+          player2: 'OOP'
+        }
+      }
+    };
+
+    console.log('🔧 Обновление настроек сессии:', settingsForServer);
+    console.log('🎯 Позиции игроков:', settingsForServer.playerRanges.positions);
+
+    this.socket.emit('update-settings', {
+      settings: settingsForServer
+    });
+  }
+
   // ===== ОБРАБОТЧИКИ СОБЫТИЙ =====
   handleSessionCreated(data) {
     this.userId = data.userId;
@@ -277,6 +312,7 @@ class MultiplayerClient {
   }
 
   handleActionProcessed(data) {
+    console.log('🎯 ПОЛУЧЕНО СОБЫТИЕ action-processed:', data);
     console.log('✅ Действие обработано:', data.action?.action, data);
     
     // 🔧 ИСПРАВЛЕНИЕ: Проверяем, участвует ли текущий игрок на этом столе
@@ -286,14 +322,23 @@ class MultiplayerClient {
         console.log(`⚠️ Игрок ${this.userId} не участвует на столе ${data.tableId}, пропускаем обработку действия`);
         return;
       }
+      console.log(`✅ Игрок ${this.userId} участвует на столе ${data.tableId}`);
+    }
+    
+    // Проверяем смену улицы перед записью действия
+    if (data.tableInfo && data.tableInfo.street) {
+      console.log(`🛣️ Проверка улицы: текущая=${data.tableInfo.street}`);
+      this.checkAndUpdateStreet(data.tableId, data.tableInfo.street);
     }
     
     // Записать действие в историю
     if (data.action && data.tableId) {
-      console.log(`📝 Записываем действие: playerId=${data.action.playerId}, action=${data.action.action}, amount=${data.action.amount || 0}, tableId=${data.tableId}`);
+      console.log(`📝 ПОПЫТКА ЗАПИСИ ДЕЙСТВИЯ: playerId=${data.action.playerId}, action=${data.action.action}, amount=${data.action.amount || 0}, tableId=${data.tableId}`);
+      console.log(`📝 Данные действия:`, data.action);
       this.recordAction(data.tableId, data.action.playerId, data.action.action, data.action.amount || 0);
     } else {
-      console.log(`❌ Не удалось записать действие: action=${!!data.action}, tableId=${data.tableId}`);
+      console.log(`❌ НЕ УДАЛОСЬ ЗАПИСАТЬ ДЕЙСТВИЕ: action=${!!data.action}, tableId=${data.tableId}`);
+      console.log(`❌ Детали:`, { action: data.action, tableId: data.tableId });
     }
     
     // Обновить интерфейс стола после действия
@@ -343,6 +388,9 @@ class MultiplayerClient {
     console.log(`🧹 Очищаем записи действий для стола ${data.tableId} при завершении раздачи`);
     this.resetActionTracker(data.tableId);
     
+    // Уведомить об завершении раздачи для счетчика раздач
+    this.notifyHandCompletedForCounter(data.tableId, data.handData);
+    
     // Обновить интерфейс стола
     if (data.tableInfo) {
       this.updateTableUI(data.tableId, data.tableInfo);
@@ -356,6 +404,23 @@ class MultiplayerClient {
     
     // Сервер автоматически запустит новую раздачу, не нужно готовить вручную
     console.log('⏳ Ожидание автоматического запуска новой раздачи...');
+  }
+
+  // Уведомить о завершении раздачи для обновления счетчика
+  async notifyHandCompletedForCounter(tableId, handData) {
+    // Проверяем, что система аутентификации доступна
+    if (typeof authManager !== 'undefined' && authManager) {
+      const result = await authManager.notifyHandCompleted(tableId, handData);
+      if (result) {
+        console.log(`📊 Счетчик раздач обновлен. Осталось: ${result.remaining_hands}`);
+        
+        if (!result.can_continue) {
+          this.showNotification('Лимит раздач исчерпан! Обратитесь к администратору.', 'error');
+        }
+      }
+    } else {
+      console.log('⚠️ Система аутентификации недоступна, счетчик раздач не обновлен');
+    }
   }
 
   // Подготовить к новой раздаче
@@ -403,20 +468,13 @@ class MultiplayerClient {
     const tableElement = document.querySelector(`[data-table-id="${tableId}"]`);
     if (!tableElement) return;
     
-    // Добавить CSS класс для анимации завершения
+    // Добавить CSS класс для анимации завершения стола (без анимации банка)
     tableElement.classList.add('hand-completed');
     
-    // Найти область банка и сделать её пульсирующей
-    const potDisplay = tableElement.querySelector('.pot-display');
-    if (potDisplay) {
-      potDisplay.classList.add('pot-winner-highlight');
-      
-      // Убрать эффекты через 3 секунды
-      setTimeout(() => {
-        potDisplay.classList.remove('pot-winner-highlight');
-        tableElement.classList.remove('hand-completed');
-      }, 3000);
-    }
+    // Убрать эффект через 3 секунды
+    setTimeout(() => {
+      tableElement.classList.remove('hand-completed');
+    }, 3000);
   }
 
   getActionText(action) {
@@ -716,32 +774,25 @@ class MultiplayerClient {
           </div>
         </div>
 
-        <!-- Нижняя строка: информация о герое слева, карты в центре, действия справа -->
-        <div class="hero-center-row">
-          <div class="hero-info-left">
-            <div class="player-info-section">
+        <!-- Герой как единый блок (аналогично верхнему игроку) -->
+        <div class="hero-area">
+          <div class="player-section hero-green">
+            <div class="player-cards-section">
+              ${this.renderHeroCards(heroPlayer)}
+            </div>
+            <div class="player-info-horizontal-green">
               ${heroPlayer ? `
                 <div class="player-name">${heroPlayer.name}</div>
                 <div class="player-position">${heroPlayer.position}</div>
-                <div class="player-stack">Стек: $${((heroPlayer.stack || 0) / 100).toFixed(2)}</div>
+                <div class="player-stack">$${((heroPlayer.stack || 0) / 100).toFixed(2)}</div>
               ` : ''}
             </div>
-          </div>
-          <div class="hero-cards-center">
-            ${this.renderHeroCards(heroPlayer)}
           </div>
           <div class="actions-right">
             <div class="table-actions">
               ${this.renderTableActions(tableInfo, tableInfo.tableId)}
             </div>
           </div>
-        </div>
-
-        <!-- Контроллы управления рукой -->
-        <div class="hand-controls">
-          <button class="btn btn-secondary" onclick="multiplayerClient.newHand('${tableInfo.tableId}')">
-            <i class="fas fa-redo"></i> Новая рука
-          </button>
         </div>
       </div>
     `;
@@ -756,10 +807,10 @@ class MultiplayerClient {
     if (!player) {
       return `
         <div class="player-section opponent">
-          <div class="player-info-section">
+          <div class="player-info-horizontal">
             <div class="player-name">Ожидание игрока...</div>
             <div class="player-position">-</div>
-            <div class="player-stack">Стек: $0.00</div>
+            <div class="player-stack">$0.00</div>
           </div>
           <div class="player-cards-section">
             <div class="player-card empty">?</div>
@@ -774,10 +825,10 @@ class MultiplayerClient {
 
     return `
       <div class="player-section opponent">
-        <div class="player-info-section">
+        <div class="player-info-horizontal">
           <div class="player-name">${player.name}</div>
           <div class="player-position">${player.position}</div>
-          <div class="player-stack">Стек: $${playerStack.toFixed(2)}</div>
+          <div class="player-stack">$${playerStack.toFixed(2)}</div>
         </div>
         <div class="player-cards-section">
           ${this.renderPlayerCards(player.cards, 'opponent')}
@@ -1556,13 +1607,13 @@ class MultiplayerClient {
       }
       
       // Обновить информацию о герое
-      const heroInfoArea = tableElement.querySelector('.hero-info-left .player-info-section');
+      const heroInfoArea = tableElement.querySelector('.player-section.hero-green .player-info-horizontal-green');
       if (heroInfoArea) {
         const heroStack = (heroPlayer.stack || 0) / 100; // конвертируем в доллары
         heroInfoArea.innerHTML = `
           <div class="player-name">${heroPlayer.name}</div>
           <div class="player-position">${heroPlayer.position}</div>
-          <div class="player-stack">Стек: $${heroStack.toFixed(2)}</div>
+          <div class="player-stack">$${heroStack.toFixed(2)}</div>
         `;
       }
     }
@@ -1769,19 +1820,222 @@ class MultiplayerClient {
   // Обработчик обновления стола
   // Обработчик обновления стола
   handleTableUpdated(data) {
-    console.log('📡 Получено обновление стола:', data);
+    console.log('🔄 Получено обновление стола:', data);
     
-    // Обновить интерфейс стола
+    const tableId = data.tableId;
+    
+    // Инициализируем трекер действий если его нет
+    this.initializeActionTracker(tableId);
+    
+    // Извлекаем информацию о столе из разных форматов данных
+    let tableInfo;
     if (data.tableInfo) {
-      this.updateTableUI(data.tableId, data.tableInfo);
+      tableInfo = data.tableInfo;
+      console.log('📦 Данные в формате tableInfo');
+    } else {
+      // Данные переданы напрямую
+      tableInfo = {
+        ...data
+      };
+      console.log('📦 Данные в новом формат (прямые поля)');
     }
     
-    // Показать сообщение если есть
-    if (data.message) {
-      this.showNotification(data.message, 'info');
+    // УЛУЧШЕННАЯ ЛОГИКА: Добавляем разделители по количеству карт И по смене улиц
+    if (tableInfo && tableInfo.communityCards) {
+      const cardCount = tableInfo.communityCards.length;
+      const currentTracker = this.actionHistory.get(tableId);
+      
+      if (currentTracker) {
+        // Инициализируем флаги если их нет
+        if (currentTracker.separatorAdded4 === undefined) currentTracker.separatorAdded4 = false;
+        if (currentTracker.separatorAdded5 === undefined) currentTracker.separatorAdded5 = false;
+        if (currentTracker.lastCardCount === undefined) currentTracker.lastCardCount = 0;
+        
+        // Проверяем, изменилось ли количество карт
+        if (cardCount !== currentTracker.lastCardCount) {
+          console.log(`🃏 Изменение количества карт: ${currentTracker.lastCardCount} → ${cardCount}`);
+          
+          // При 4 картах добавляем первый разделитель (флоп -> тёрн)
+          if (cardCount === 4 && !currentTracker.separatorAdded4) {
+            console.log(`🛣️ Добавляем разделитель при 4 картах (флоп → тёрн)`);
+            this.addSeparatorToActions(tableId);
+            currentTracker.separatorAdded4 = true;
+            // Также меняем улицу в трекере
+            currentTracker.setStreet('turn');
+          }
+          // При 5 картах добавляем второй разделитель (тёрн -> ривер)
+          else if (cardCount === 5 && !currentTracker.separatorAdded5) {
+            console.log(`🛣️ Добавляем разделитель при 5 картах (тёрн → ривер)`);
+            this.addSeparatorToActions(tableId);
+            currentTracker.separatorAdded5 = true;
+            // Также меняем улицу в трекере
+            currentTracker.setStreet('river');
+          }
+          
+          // Обновляем последнее количество карт
+          currentTracker.lastCardCount = cardCount;
+        }
+      }
     }
     
-    console.log(`✅ Стол ${data.tableId} обновлен: ${data.message || 'обновление состояния'}`);
+    // ДОПОЛНИТЕЛЬНАЯ ЛОГИКА: Проверяем смену улиц по полю street
+    if (tableInfo && tableInfo.street) {
+      const currentTracker = this.actionHistory.get(tableId);
+      if (currentTracker && currentTracker.currentStreet !== tableInfo.street) {
+        console.log(`🛣️ Смена улицы через поле street: ${currentTracker.currentStreet} → ${tableInfo.street}`);
+        
+        // Добавляем разделитель если есть действия на текущей улице
+        const hasHeroActions = currentTracker.heroActions[currentTracker.currentStreet] && 
+                              currentTracker.heroActions[currentTracker.currentStreet].length > 0;
+        const hasOpponentActions = currentTracker.opponentActions[currentTracker.currentStreet] && 
+                                  currentTracker.opponentActions[currentTracker.currentStreet].length > 0;
+        
+        if (hasHeroActions || hasOpponentActions) {
+          console.log(`➕ Добавляем разделитель при смене улицы через street поле`);
+          this.addSeparatorToActions(tableId);
+        }
+        
+        // Устанавливаем новую улицу
+        currentTracker.setStreet(tableInfo.street);
+      }
+    }
+    
+    console.log('🔄 Обработка обновления стола:', {
+      tableId,
+      currentPlayer: tableInfo?.currentPlayer,
+      currentBet: tableInfo?.currentBet,
+      players: tableInfo?.players?.map(p => ({ id: p.id, name: p.name, bet: p.bet, hasActed: p.hasActed })),
+      myUserId: this.userId
+    });
+    
+    // 🔧 ИСПРАВЛЕНИЕ: Проверяем, участвует ли текущий игрок на этом столе
+    if (tableInfo.players && tableInfo.players.length > 0) {
+      const heroPlayer = tableInfo.players.find(p => p.id === this.userId);
+      console.log('🎯 Поиск героя:', {
+        myUserId: this.userId,
+        foundHero: !!heroPlayer,
+        heroData: heroPlayer,
+        allPlayerIds: tableInfo.players.map(p => p.id)
+      });
+      
+      if (!heroPlayer) {
+        console.log(`⚠️ Игрок ${this.userId} не участвует на столе ${tableId}, пропускаем обновление стола`);
+        return;
+      }
+    }
+    
+    // Проверяем и записываем действия игроков
+    if (tableInfo.players) {
+      // Получаем предыдущее состояние стола для сравнения
+      const previousTableInfo = this.tables.get(tableId);
+      
+      tableInfo.players.forEach(player => {
+        // Получаем предыдущее состояние игрока
+        let previousPlayer = null;
+        let previousBet = 0;
+        let previousHasActed = false;
+        
+        if (previousTableInfo && previousTableInfo.players) {
+          previousPlayer = previousTableInfo.players.find(p => p.id === player.id);
+          if (previousPlayer) {
+            previousBet = previousPlayer.bet || 0;
+            previousHasActed = previousPlayer.hasActed || false;
+          }
+        }
+        
+        // Записываем действие только если игрок только что совершил его
+        if (player.hasActed && !previousHasActed) {
+          let action = 'check';
+          let amount = player.bet;
+          
+          // Проверяем, не фолд ли это
+          if (player.folded || (player.bet === 0 && tableInfo.currentBet > 0)) {
+            action = 'fold';
+            amount = 0;
+          } else if (player.bet === 0 && tableInfo.currentBet === 0) {
+            // Игрок поставил 0 при отсутствии ставок на столе - это CHECK
+            action = 'check';
+            amount = 0;
+          } else if (player.bet > 0) {
+            // УЛУЧШЕННАЯ ЛОГИКА: определяем действие по контексту
+            
+            // Получаем максимальную ставку среди других игроков (исключая текущего)
+            const otherPlayersBets = tableInfo.players
+              .filter(p => p.id !== player.id)
+              .map(p => p.bet || 0);
+            const maxOtherBet = Math.max(0, ...otherPlayersBets);
+            
+            console.log(`🎯 Анализ ставки игрока ${player.name}: его ставка=${player.bet}, макс. ставка других=${maxOtherBet}, текущая ставка стола=${tableInfo.currentBet}, предыдущая ставка=${previousBet}`);
+            
+            // Если игрок уравнял текущую ставку стола - это CALL
+            if (player.bet === tableInfo.currentBet && tableInfo.currentBet > 0) {
+              action = 'call';
+            }
+            // Если игрок поставил больше текущей ставки стола - это BET или RAISE
+            else if (player.bet > tableInfo.currentBet) {
+              if (tableInfo.currentBet === 0) {
+                // Нет ставки на столе - это BET
+                action = 'bet';
+              } else {
+                // Есть ставка на столе - это RAISE
+                action = 'raise';
+              }
+            }
+            // Если игрок поставил меньше текущей ставки стола - это может быть ALL-IN или ошибка
+            else if (player.bet < tableInfo.currentBet && player.bet > 0) {
+              // Предполагаем что это ALL-IN
+              action = 'call'; // или 'all-in' если хотим отдельно отслеживать
+            }
+            // Fallback - если логика не сработала
+            else {
+              if (tableInfo.currentBet === 0) {
+                action = 'bet';
+              } else {
+                action = 'call';
+              }
+            }
+          } else {
+            // Ставка 0 - проверяем контекст
+            if (tableInfo.currentBet === 0) {
+              action = 'check';
+            } else {
+              // Если есть ставка на столе, а игрок поставил 0 - это фолд
+              action = 'fold';
+            }
+          }
+          
+          console.log(`🎯 Записываем действие: игрок ${player.name}, действие: ${action}, сумма: ${amount}, текущая ставка стола: ${tableInfo.currentBet}, предыдущая ставка игрока: ${previousBet}`);
+          this.recordAction(tableId, player.id, action, amount);
+        }
+      });
+    }
+
+    // Обновить кэш стола
+    this.tables.set(tableId, tableInfo);
+    
+    // Обновить анимации очереди хода
+    this.updatePlayerTurnAnimationsFromTableInfo(tableInfo);
+    
+    // Найти элемент стола
+    const tableElement = document.querySelector(`[data-table-id="${tableId}"]`);
+    console.log('🔍 Поиск элемента стола:', {
+      tableId,
+      elementFound: !!tableElement,
+      selector: `[data-table-id="${tableId}"]`
+    });
+    
+    if (tableElement) {
+      // 🔧 ИСПРАВЛЕНИЕ: Используем updateTableUI вместо полной замены элемента
+      console.log('🔄 Вызов updateTableUI для стола:', tableId);
+      this.updateTableUI(tableId, tableInfo);
+      
+      console.log('✅ Стол обновлен через updateTableUI');
+    } else {
+      console.error('❌ Элемент стола не найден:', tableId);
+      // Попробуем найти все элементы столов для отладки
+      const allTables = document.querySelectorAll('[data-table-id]');
+      console.log('🔍 Все найденные столы:', Array.from(allTables).map(el => el.getAttribute('data-table-id')));
+    }
   }
 
   handleTableUpdate(data) {
@@ -1848,20 +2102,35 @@ class MultiplayerClient {
       const currentTracker = this.actionHistory.get(tableId);
       
       if (currentTracker) {
-        // При 4 картах добавляем первый разделитель (флоп -> тёрн)
-        if (cardCount === 4 && !currentTracker.separatorAdded4) {
-          console.log(`🛣️ Добавляем разделитель при 4 картах (флоп -> тёрн)`);
-          this.addSeparatorToActions(tableId);
-          currentTracker.separatorAdded4 = true;
-        }
-        // При 5 картах добавляем второй разделитель (тёрн -> ривер)
-        else if (cardCount === 5 && !currentTracker.separatorAdded5) {
-          console.log(`🛣️ Добавляем разделитель при 5 картах (тёрн -> ривер)`);
-          this.addSeparatorToActions(tableId);
-          currentTracker.separatorAdded5 = true;
-        }
+        // Инициализируем флаги если их нет
+        if (currentTracker.separatorAdded4 === undefined) currentTracker.separatorAdded4 = false;
+        if (currentTracker.separatorAdded5 === undefined) currentTracker.separatorAdded5 = false;
+        if (currentTracker.lastCardCount === undefined) currentTracker.lastCardCount = 0;
         
-        this.updateActionDisplays(tableId);
+        // Проверяем, изменилось ли количество карт
+        if (cardCount !== currentTracker.lastCardCount) {
+          console.log(`🃏 Изменение количества карт: ${currentTracker.lastCardCount} → ${cardCount}`);
+          
+          // При 4 картах добавляем первый разделитель (флоп -> тёрн)
+          if (cardCount === 4 && !currentTracker.separatorAdded4) {
+            console.log(`🛣️ Добавляем разделитель при 4 картах (флоп → тёрн)`);
+            this.addSeparatorToActions(tableId);
+            currentTracker.separatorAdded4 = true;
+            // Также меняем улицу в трекере
+            currentTracker.setStreet('turn');
+          }
+          // При 5 картах добавляем второй разделитель (тёрн -> ривер)
+          else if (cardCount === 5 && !currentTracker.separatorAdded5) {
+            console.log(`🛣️ Добавляем разделитель при 5 картах (тёрн → ривер)`);
+            this.addSeparatorToActions(tableId);
+            currentTracker.separatorAdded5 = true;
+            // Также меняем улицу в трекере
+            currentTracker.setStreet('river');
+          }
+          
+          // Обновляем последнее количество карт
+          currentTracker.lastCardCount = cardCount;
+        }
       }
     }
     
@@ -2329,7 +2598,12 @@ class MultiplayerClient {
   // ===== МЕТОДЫ ДЛЯ РАБОТЫ С ИСТОРИЕЙ ДЕЙСТВИЙ =====
   initializeActionTracker(tableId) {
     if (!this.actionHistory.has(tableId)) {
-      this.actionHistory.set(tableId, new ActionTracker());
+      const tracker = new ActionTracker();
+      // Инициализируем флаги разделителей
+      tracker.separatorAdded4 = false;
+      tracker.separatorAdded5 = false;
+      tracker.lastCardCount = 0;
+      this.actionHistory.set(tableId, tracker);
     }
   }
 
@@ -2374,20 +2648,54 @@ class MultiplayerClient {
     const tracker = this.actionHistory.get(tableId);
     if (tracker) {
       tracker.addSeparator();
+      // Сразу обновляем отображение после добавления разделителя
+      this.updateActionDisplays(tableId);
     }
   }
 
   recordAction(tableId, playerId, action, amount) {
+    console.log(`🎯 ВЫЗОВ recordAction: tableId=${tableId}, playerId=${playerId}, action=${action}, amount=${amount}`);
+    
     this.initializeActionTracker(tableId);
     const tracker = this.actionHistory.get(tableId);
     
+    if (!tracker) {
+      console.log(`❌ Трекер не найден для стола ${tableId}`);
+      return;
+    }
+    
     // Определяем, является ли это действие героя
     const isHero = playerId === this.userId;
+    console.log(`🎯 Определение героя: playerId=${playerId}, this.userId=${this.userId}, isHero=${isHero}`);
     
     tracker.addAction(playerId, action, amount, isHero);
     this.updateActionDisplays(tableId);
     
-    console.log(`📝 Записано действие: ${action} ${amount} для игрока ${playerId} (герой: ${isHero})`);
+    console.log(`📝 ЗАПИСАНО ДЕЙСТВИЕ: ${action} ${amount} для игрока ${playerId} (герой: ${isHero})`);
+  }
+
+  checkAndUpdateStreet(tableId, newStreet) {
+    console.log(`🛣️ Проверка смены улицы для стола ${tableId}: новая улица = ${newStreet}`);
+    this.initializeActionTracker(tableId);
+    const tracker = this.actionHistory.get(tableId);
+    
+    if (tracker.currentStreet !== newStreet) {
+      console.log(`🔄 Смена улицы: ${tracker.currentStreet} → ${newStreet}`);
+      
+      // Добавляем разделитель перед сменой улицы (если есть действия)
+      if (tracker.heroActions[tracker.currentStreet].length > 0 || 
+          tracker.opponentActions[tracker.currentStreet].length > 0) {
+        console.log(`➕ Добавляем разделитель перед сменой улицы`);
+        tracker.addSeparator();
+      }
+      
+      // Устанавливаем новую улицу
+      tracker.setStreet(newStreet);
+      this.updateActionDisplays(tableId);
+      
+      // Показываем уведомление о смене улицы
+      this.showNotification(`Новая улица: ${this.getStreetName(newStreet)}`, 'info');
+    }
   }
 
   setStreet(tableId, street) {
@@ -2419,7 +2727,7 @@ class MultiplayerClient {
     if (heroActionsElement) {
       const heroActionsString = tracker.getActionsString(true);
       console.log(`🎯 Строка действий героя: "${heroActionsString}"`);
-      heroActionsElement.textContent = heroActionsString || '';
+      heroActionsElement.innerHTML = heroActionsString || '';
     } else {
       console.log(`❌ Элемент .hero-actions-display .actions-text не найден для стола ${tableId}`);
     }
@@ -2430,10 +2738,88 @@ class MultiplayerClient {
     if (opponentActionsElement) {
       const opponentActionsString = tracker.getActionsString(false);
       console.log(`🎯 Строка действий оппонента: "${opponentActionsString}"`);
-      opponentActionsElement.textContent = opponentActionsString || '';
+      opponentActionsElement.innerHTML = opponentActionsString || '';
     } else {
       console.log(`❌ Элемент .opponent-actions-display .actions-text не найден для стола ${tableId}`);
     }
+  }
+
+  // ===== АНИМАЦИИ ОЧЕРЕДИ ХОДА В МУЛЬТИПЛЕЕРЕ =====
+
+  setPlayerTurnAnimation(playerId, isActive = true) {
+    console.log(`🎬 Установка анимации очереди хода для игрока ${playerId}, активная: ${isActive}`);
+    
+    // Очищаем все анимации
+    this.clearAllPlayerTurnAnimations();
+    
+    if (!isActive) return;
+    
+    // Находим контейнер для данного игрока
+    const tables = document.querySelectorAll('.multiplayer-table');
+    
+    tables.forEach(table => {
+      const tableId = table.dataset.tableId;
+      
+      // Проверяем героя
+      const heroSection = table.querySelector('.player-section.hero-green');
+      const heroPlayer = this.findPlayerInTableInfo(tableId, 'hero');
+      
+      if (heroPlayer && heroPlayer.id === playerId && heroSection) {
+        heroSection.classList.add('active-turn');
+        console.log(`🎬 Анимация активирована для героя на столе ${tableId}`);
+        return;
+      }
+      
+      // Проверяем оппонента
+      const opponentArea = table.querySelector('.opponent-area-compact');
+      const opponentPlayer = this.findPlayerInTableInfo(tableId, 'opponent');
+      
+      if (opponentPlayer && opponentPlayer.id === playerId && opponentArea) {
+        opponentArea.classList.add('active-turn');
+        console.log(`🎬 Анимация активирована для оппонента на столе ${tableId}`);
+        return;
+      }
+    });
+  }
+
+  clearAllPlayerTurnAnimations() {
+    // Убираем анимацию у всех возможных контейнеров игроков
+    const containers = document.querySelectorAll(
+      '.opponent-area-compact.active-turn, .player-section.hero-green.active-turn'
+    );
+    
+    containers.forEach(container => {
+      container.classList.remove('active-turn');
+    });
+    
+    console.log(`🎬 Очищены анимации очереди хода в мультиплеере (${containers.length} контейнеров)`);
+  }
+
+  updatePlayerTurnAnimationsFromTableInfo(tableInfo) {
+    console.log('🎬 Обновление анимаций очереди хода:', {
+      currentPlayer: tableInfo.currentPlayer,
+      actionRequired: tableInfo.actionRequired
+    });
+    
+    if (tableInfo.currentPlayer && tableInfo.actionRequired) {
+      this.setPlayerTurnAnimation(tableInfo.currentPlayer, true);
+    } else {
+      this.clearAllPlayerTurnAnimations();
+    }
+  }
+
+  findPlayerInTableInfo(tableId, role) {
+    // Заглушка - нужно получить информацию о игроке из кеша таблиц
+    const tableData = this.sessionInfo?.tables?.find(t => t.tableId === tableId);
+    if (!tableData) return null;
+    
+    if (role === 'hero') {
+      return tableData.players.find(p => p.id === this.currentUserId);
+    } else if (role === 'opponent') {
+      return tableData.players.find(p => p.id !== this.currentUserId);
+    }
+    
+    return null;
   }
 }
 
@@ -3105,14 +3491,29 @@ class ActionTracker {
   }
 
   addSeparator() {
-    console.log(`➕ ActionTracker: добавление разделителя "|"`);
+    console.log(`➕ ActionTracker: добавление разделителя "|" на улице ${this.currentStreet}`);
+    
     // Добавляем разделитель к текущим действиям обоих игроков
     // Но только если у них есть действия на текущей улице
-    if (this.heroActions[this.currentStreet] && this.heroActions[this.currentStreet].length > 0) {
+    const hasHeroActions = this.heroActions[this.currentStreet] && this.heroActions[this.currentStreet].length > 0;
+    const hasOpponentActions = this.opponentActions[this.currentStreet] && this.opponentActions[this.currentStreet].length > 0;
+    
+    console.log(`🎯 Проверка действий для разделителя:`, {
+      currentStreet: this.currentStreet,
+      hasHeroActions,
+      hasOpponentActions,
+      heroActions: this.heroActions[this.currentStreet],
+      opponentActions: this.opponentActions[this.currentStreet]
+    });
+    
+    // Добавляем разделитель только если есть действия на текущей улице
+    if (hasHeroActions) {
       this.heroActions[this.currentStreet].push('|');
+      console.log(`✅ Добавлен разделитель к действиям героя`);
     }
-    if (this.opponentActions[this.currentStreet] && this.opponentActions[this.currentStreet].length > 0) {
+    if (hasOpponentActions) {
       this.opponentActions[this.currentStreet].push('|');
+      console.log(`✅ Добавлен разделитель к действиям оппонента`);
     }
   }
 
@@ -3151,19 +3552,19 @@ class ActionTracker {
   getActionCode(action, amount) {
     switch (action) {
       case 'check':
-        return 'X';
+        return '<span class="action-check">Check</span>';
       case 'call':
-        return 'C';
+        return `<span class="action-call">Call ${this.formatAmount(amount)}</span>`;
       case 'bet':
-        return `B${this.formatAmount(amount)}`;
+        return `<span class="action-bet">Bet ${this.formatAmount(amount)}</span>`;
       case 'raise':
-        return `R${this.formatAmount(amount)}`;
+        return `<span class="action-raise">Raise ${this.formatAmount(amount)}</span>`;
       case 'fold':
-        return 'F';
+        return '<span class="action-fold">Fold</span>';
       case 'all-in':
-        return `AI${this.formatAmount(amount)}`;
+        return `<span class="action-bet">All-in ${this.formatAmount(amount)}</span>`;
       default:
-        return action.charAt(0).toUpperCase();
+        return `<span class="action-check">${action}</span>`;
     }
   }
 
@@ -3171,19 +3572,19 @@ class ActionTracker {
     // Конвертируем центы в доллары
     const dollars = amount / 100;
     
-    // Убираем нули для круглых сумм
+    // Форматируем с символом доллара
     if (dollars >= 1000) {
-      return `${(dollars / 1000).toFixed(1).replace('.0', '')}k`;
+      return `$${(dollars / 1000).toFixed(1).replace('.0', '')}k`;
     } else if (dollars % 1 === 0) {
-      return dollars.toString();
+      return `$${dollars}`;
     } else {
-      return dollars.toFixed(2).replace(/\.?0+$/, '');
+      return `$${dollars.toFixed(2).replace(/\.?0+$/, '')}`;
     }
   }
 
   getActionsString(isHero) {
     const playerActions = isHero ? this.heroActions : this.opponentActions;
-    const streets = [];
+    const allActions = [];
 
     console.log(`🎯 Формирование строки действий для ${isHero ? 'героя' : 'оппонента'}:`, {
       flop: playerActions.flop,
@@ -3191,17 +3592,19 @@ class ActionTracker {
       river: playerActions.river
     });
 
+    // Собираем все действия в одну строку с простыми разделителями
     if (playerActions.flop.length > 0) {
-      streets.push(playerActions.flop.join(''));
+      allActions.push(...playerActions.flop);
     }
     if (playerActions.turn.length > 0) {
-      streets.push(playerActions.turn.join(''));
+      allActions.push(...playerActions.turn);
     }
     if (playerActions.river.length > 0) {
-      streets.push(playerActions.river.join(''));
+      allActions.push(...playerActions.river);
     }
 
-    const result = streets.join('|');
+    // Соединяем все действия простыми пробелами
+    const result = allActions.join(' ');
     console.log(`🎯 Итоговая строка действий: "${result}"`);
     return result;
   }
