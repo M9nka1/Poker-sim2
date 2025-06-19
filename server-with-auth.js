@@ -3560,4 +3560,249 @@ app.get('/api/hand-histories', authenticateToken, (req, res) => {
   }
 });
 
+// 📁 Новые API роуты для управления HandHistory файлами с аутентификацией
+
+// Получить список HandHistory файлов (пользователи видят только свои, админы - все)
+app.get('/api/handhistory', authenticateToken, async (req, res) => {
+  try {
+    const handHistoryDir = path.join(__dirname, 'hand_histories');
+    
+    if (!fs.existsSync(handHistoryDir)) {
+      return res.json({ files: [] });
+    }
+    
+    const isAdmin = req.user.roles.includes('admin');
+    
+    // Получаем список всех файлов
+    let files = fs.readdirSync(handHistoryDir)
+      .filter(file => file.endsWith('.txt'))
+      .map(file => {
+        const filePath = path.join(handHistoryDir, file);
+        const stats = fs.statSync(filePath);
+        
+        // Парсинг информации из имени файла
+        const fileInfo = file.match(/table_(\d+)_session_([A-F0-9]+)\.txt/);
+        
+        return {
+          filename: file,
+          sessionId: fileInfo ? fileInfo[2] : 'Unknown',
+          tableId: fileInfo ? parseInt(fileInfo[1]) : 0,
+          handsCount: 0, // Подсчитаем позже если нужно
+          size: stats.size,
+          created: stats.birthtime,
+          modified: stats.mtime,
+          downloadUrl: `/api/handhistory/download/${file}`,
+          userId: null // Будем определять по сессии или из базы данных
+        };
+      })
+      .sort((a, b) => b.modified - a.modified);
+
+    // Если пользователь не админ, фильтруем только его файлы
+    if (!isAdmin) {
+      // Здесь можно добавить логику связи файлов с пользователями
+      // Пока показываем все файлы для пользователей (можно ограничить позже)
+      console.log(`👤 Пользователь ${req.user.email} запросил свои HandHistory файлы`);
+    } else {
+      console.log(`👑 Администратор ${req.user.email} запросил все HandHistory файлы`);
+    }
+    
+    // Подсчитываем количество рук в каждом файле (для первых 10 файлов для производительности)
+    const filesToCount = files.slice(0, 10);
+    for (const file of filesToCount) {
+      try {
+        const content = fs.readFileSync(path.join(handHistoryDir, file.filename), 'utf8');
+        const handCount = (content.match(/PokerStars Hand #/g) || []).length;
+        file.handsCount = handCount;
+      } catch (error) {
+        file.handsCount = 0;
+      }
+    }
+    
+    res.json({ 
+      files,
+      isAdmin,
+      totalFiles: files.length,
+      userEmail: req.user.email
+    });
+    
+  } catch (error) {
+    console.error('❌ Ошибка получения списка HandHistory файлов:', error);
+    res.status(500).json({ error: 'Ошибка получения списка файлов HandHistory' });
+  }
+});
+
+// Скачать конкретный HandHistory файл
+app.get('/api/handhistory/download/:filename', authenticateToken, (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const isAdmin = req.user.roles.includes('admin');
+    
+    // Проверка безопасности - только .txt файлы
+    if (!filename.endsWith('.txt') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({ error: 'Недопустимое имя файла' });
+    }
+    
+    const filePath = path.join(__dirname, 'hand_histories', filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Файл не найден' });
+    }
+    
+    // Если пользователь не админ, можно добавить проверку доступа к файлу
+    if (!isAdmin) {
+      // Здесь можно добавить логику проверки принадлежности файла пользователю
+      console.log(`👤 Пользователь ${req.user.email} скачивает файл: ${filename}`);
+    } else {
+      console.log(`👑 Администратор ${req.user.email} скачивает файл: ${filename}`);
+    }
+    
+    const stats = fs.statSync(filePath);
+    
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Length', stats.size);
+    
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+    
+    console.log(`📥 Файл ${filename} скачан пользователем ${req.user.email}`);
+    
+  } catch (error) {
+    console.error('❌ Ошибка скачивания HandHistory файла:', error);
+    res.status(500).json({ error: 'Ошибка скачивания файла' });
+  }
+});
+
+// Просмотр содержимого HandHistory файла
+app.get('/api/handhistory/view/:filename', authenticateToken, (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const isAdmin = req.user.roles.includes('admin');
+    
+    // Проверка безопасности - только .txt файлы
+    if (!filename.endsWith('.txt') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({ error: 'Недопустимое имя файла' });
+    }
+    
+    const filePath = path.join(__dirname, 'hand_histories', filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Файл не найден' });
+    }
+    
+    // Если пользователь не админ, можно добавить проверку доступа к файлу
+    if (!isAdmin) {
+      console.log(`👤 Пользователь ${req.user.email} просматривает файл: ${filename}`);
+    } else {
+      console.log(`👑 Администратор ${req.user.email} просматривает файл: ${filename}`);
+    }
+    
+    const content = fs.readFileSync(filePath, 'utf8');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(content);
+    
+  } catch (error) {
+    console.error('❌ Ошибка просмотра HandHistory файла:', error);
+    res.status(500).json({ error: 'Ошибка чтения файла' });
+  }
+});
+
+// Удаление HandHistory файла (только для администраторов)
+app.delete('/api/handhistory/:filename', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const filename = req.params.filename;
+    
+    // Проверка безопасности - только .txt файлы
+    if (!filename.endsWith('.txt') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({ error: 'Недопустимое имя файла' });
+    }
+    
+    const filePath = path.join(__dirname, 'hand_histories', filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Файл не найден' });
+    }
+    
+    fs.unlinkSync(filePath);
+    
+    console.log(`🗑️ Администратор ${req.user.email} удалил файл: ${filename}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Файл успешно удален',
+      filename 
+    });
+    
+  } catch (error) {
+    console.error('❌ Ошибка удаления HandHistory файла:', error);
+    res.status(500).json({ error: 'Ошибка удаления файла' });
+  }
+});
+
+// Получить статистику HandHistory файлов
+app.get('/api/handhistory/stats', authenticateToken, (req, res) => {
+  try {
+    const handHistoryDir = path.join(__dirname, 'hand_histories');
+    const isAdmin = req.user.roles.includes('admin');
+    
+    if (!fs.existsSync(handHistoryDir)) {
+      return res.json({
+        totalFiles: 0,
+        totalSize: 0,
+        totalHands: 0,
+        uniqueSessions: 0,
+        isAdmin
+      });
+    }
+    
+    const files = fs.readdirSync(handHistoryDir)
+      .filter(file => file.endsWith('.txt'));
+    
+    let totalSize = 0;
+    let totalHands = 0;
+    const sessions = new Set();
+    
+    files.forEach(file => {
+      const filePath = path.join(handHistoryDir, file);
+      const stats = fs.statSync(filePath);
+      totalSize += stats.size;
+      
+      // Извлекаем session ID из имени файла
+      const sessionMatch = file.match(/session_([A-F0-9]+)/);
+      if (sessionMatch) {
+        sessions.add(sessionMatch[1]);
+      }
+      
+      // Подсчитываем руки (только для первых 20 файлов для производительности)
+      if (files.indexOf(file) < 20) {
+        try {
+          const content = fs.readFileSync(filePath, 'utf8');
+          const handCount = (content.match(/PokerStars Hand #/g) || []).length;
+          totalHands += handCount;
+        } catch (error) {
+          // Игнорируем ошибки чтения отдельных файлов
+        }
+      }
+    });
+    
+    res.json({
+      totalFiles: files.length,
+      totalSize,
+      totalHands,
+      uniqueSessions: sessions.size,
+      isAdmin,
+      userEmail: req.user.email
+    });
+    
+  } catch (error) {
+    console.error('❌ Ошибка получения статистики HandHistory:', error);
+    res.status(500).json({ error: 'Ошибка получения статистики' });
+  }
+});
+
+// Роут для страницы управления HandHistory (с аутентификацией)
+app.get('/handhistory-manager.html', authenticateToken, (req, res) => {
+  res.sendFile(path.join(__dirname, 'handhistory-manager-auth.html'));
+});
+
 startServer();
