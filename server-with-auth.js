@@ -358,6 +358,234 @@ app.get('/api/admin/hands/all/download', authenticateToken, requireAdmin, async 
   }
 });
 
+// ===== API для HANDHISTORY ФАЙЛОВ =====
+
+// Получение списка HandHistory файлов для пользователя
+app.get('/api/me/handhistory', authenticateToken, async (req, res) => {
+  try {
+    const handHistoryDir = path.join(__dirname, 'hand_histories');
+    
+    if (!fs.existsSync(handHistoryDir)) {
+      return res.json({
+        success: true,
+        data: {
+          files: [],
+          total: 0,
+          message: 'Папка HandHistory не найдена. Сыграйте несколько раздач для создания файлов.'
+        }
+      });
+    }
+
+    // Читаем все файлы в папке
+    const files = fs.readdirSync(handHistoryDir);
+    const userFiles = [];
+
+    for (const file of files) {
+      if (file.endsWith('.txt')) {
+        const filePath = path.join(handHistoryDir, file);
+        const stats = fs.statSync(filePath);
+        
+        // Пытаемся прочитать файл и проверить, есть ли в нем раздачи для этого пользователя
+        try {
+          const content = fs.readFileSync(filePath, 'utf8');
+          
+          // Подсчитываем количество раздач в файле
+          const handMatches = content.match(/PokerStars Hand #/g);
+          const handCount = handMatches ? handMatches.length : 0;
+          
+          if (handCount > 0) {
+            userFiles.push({
+              filename: file,
+              size: stats.size,
+              modified: stats.mtime,
+              handCount: handCount,
+              canDownload: true
+            });
+          }
+        } catch (error) {
+          console.error(`❌ Ошибка чтения файла HandHistory ${file}:`, error.message);
+        }
+      }
+    }
+
+    // Сортируем по дате изменения (новые сначала)
+    userFiles.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+
+    res.json({
+      success: true,
+      data: {
+        files: userFiles,
+        total: userFiles.length,
+        totalHands: userFiles.reduce((sum, file) => sum + file.handCount, 0)
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Ошибка получения HandHistory файлов:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Внутренняя ошибка сервера'
+    });
+  }
+});
+
+// Скачивание конкретного HandHistory файла
+app.get('/api/me/handhistory/:filename/download', authenticateToken, async (req, res) => {
+  try {
+    const { filename } = req.params;
+    
+    // Проверка безопасности имени файла
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Недопустимое имя файла'
+      });
+    }
+
+    if (!filename.endsWith('.txt')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Можно скачивать только .txt файлы'
+      });
+    }
+
+    const filePath = path.join(__dirname, 'hand_histories', filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Файл HandHistory не найден'
+      });
+    }
+
+    // Читаем содержимое файла
+    const content = fs.readFileSync(filePath, 'utf8');
+    
+    // Устанавливаем заголовки для скачивания
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    
+    res.send(content);
+
+  } catch (error) {
+    console.error('❌ Ошибка скачивания HandHistory файла:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Внутренняя ошибка сервера'
+    });
+  }
+});
+
+// Получение всех HandHistory файлов (только для админов)
+app.get('/api/admin/handhistory', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const handHistoryDir = path.join(__dirname, 'hand_histories');
+    
+    if (!fs.existsSync(handHistoryDir)) {
+      return res.json({
+        success: true,
+        data: {
+          files: [],
+          total: 0,
+          message: 'Папка HandHistory не найдена'
+        }
+      });
+    }
+
+    const files = fs.readdirSync(handHistoryDir);
+    const allFiles = [];
+
+    for (const file of files) {
+      if (file.endsWith('.txt')) {
+        const filePath = path.join(handHistoryDir, file);
+        const stats = fs.statSync(filePath);
+        
+        try {
+          const content = fs.readFileSync(filePath, 'utf8');
+          const handMatches = content.match(/PokerStars Hand #/g);
+          const handCount = handMatches ? handMatches.length : 0;
+          
+          allFiles.push({
+            filename: file,
+            size: stats.size,
+            created: stats.birthtime,
+            modified: stats.mtime,
+            handCount: handCount
+          });
+        } catch (error) {
+          console.error(`❌ Ошибка чтения файла HandHistory ${file}:`, error.message);
+        }
+      }
+    }
+
+    // Сортируем по дате изменения (новые сначала)  
+    allFiles.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+
+    res.json({
+      success: true,
+      data: {
+        files: allFiles,
+        total: allFiles.length,
+        totalHands: allFiles.reduce((sum, file) => sum + file.handCount, 0)
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Ошибка получения всех HandHistory файлов:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Внутренняя ошибка сервера'
+    });
+  }
+});
+
+// Скачивание HandHistory файла администратором
+app.get('/api/admin/handhistory/:filename/download', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { filename } = req.params;
+    
+    // Проверка безопасности имени файла
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Недопустимое имя файла'
+      });
+    }
+
+    if (!filename.endsWith('.txt')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Можно скачивать только .txt файлы'
+      });
+    }
+
+    const filePath = path.join(__dirname, 'hand_histories', filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Файл HandHistory не найден'
+      });
+    }
+
+    // Читаем содержимое файла
+    const content = fs.readFileSync(filePath, 'utf8');
+    
+    // Устанавливаем заголовки для скачивания
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    
+    res.send(content);
+
+  } catch (error) {
+    console.error('❌ Ошибка скачивания HandHistory файла администратором:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Внутренняя ошибка сервера'
+    });
+  }
+});
+
 // ===== ИГРОВОЙ API (с проверкой лимитов) =====
 
 // Эндпоинт для игры раздачи
@@ -922,11 +1150,34 @@ class PokerTable {
   }
   
   initializeHandHistoryFile() {
-    const sessionDir = path.join(__dirname, 'hand_histories');
-    if (!fs.existsSync(sessionDir)) {
-      fs.mkdirSync(sessionDir, { recursive: true });
+    try {
+      const sessionDir = path.join(__dirname, 'hand_histories');
+      
+      // Проверяем существование папки и создаем если необходимо
+      if (!fs.existsSync(sessionDir)) {
+        console.log(`📁 Создаем папку HandHistory: ${sessionDir}`);
+        fs.mkdirSync(sessionDir, { recursive: true });
+        console.log(`✅ Папка HandHistory создана успешно`);
+      } else {
+        console.log(`📁 Папка HandHistory уже существует: ${sessionDir}`);
+      }
+      
+      // Формируем путь к файлу
+      this.handHistoryFile = path.join(sessionDir, `table_${this.tableId}_session_${this.sessionId}.txt`);
+      console.log(`📝 HandHistory файл инициализирован: ${this.handHistoryFile}`);
+      
+      // Проверяем права на запись в папку
+      try {
+        fs.accessSync(sessionDir, fs.constants.W_OK);
+        console.log(`✅ Папка ${sessionDir} доступна для записи`);
+      } catch (accessError) {
+        console.error(`❌ Нет прав на запись в папку ${sessionDir}:`, accessError.message);
+      }
+      
+    } catch (error) {
+      console.error(`❌ Ошибка инициализации HandHistory файла:`, error);
+      this.handHistoryFile = null; // Отключаем файловое сохранение при ошибке
     }
-    this.handHistoryFile = path.join(sessionDir, `table_${this.tableId}_session_${this.sessionId}.txt`);
   }
   
   parsePlayerNicknames() {
@@ -1700,7 +1951,7 @@ class PokerTable {
     });
   }
   
-  processPlayerAction(playerId, action, amount = 0) {
+  async processPlayerAction(playerId, action, amount = 0) {
     const player = this.players.get(playerId);
     if (!player) {
       return { success: false, error: 'Игрок не найден' };
@@ -1728,7 +1979,7 @@ class PokerTable {
     if (result.success) {
       // Проверка завершения торгов ПЕРЕД переходом к следующему игроку
       if (this.isBettingRoundComplete()) {
-        this.completeBettingRound();
+        await this.completeBettingRound();
       } else {
         // Переход к следующему игроку только если торги не завершены
         this.moveToNextPlayer();
@@ -2033,7 +2284,7 @@ class PokerTable {
   }
   
   // Завершение торгов на улице
-  completeBettingRound() {
+  async completeBettingRound() {
     console.log(`🏁 Торги на ${this.currentStreet} завершены`);
     
     // Проверяем, остался ли только один игрок в игре
@@ -2057,7 +2308,7 @@ class PokerTable {
       console.log(`🏦 Общий банк: $${(this.pot / 100).toFixed(2)}, отображаемый банк улицы: $${(this.streetPot / 100).toFixed(2)}`);
       
       // Завершаем раздачу немедленно
-      this.completeHand();
+      await this.completeHand();
       return;
     }
     
@@ -2087,16 +2338,16 @@ class PokerTable {
     
     if (allInDetected) {
       console.log('🎯 Обнаружен All-in! Автоматическая раздача оставшихся карт...');
-      this.handleAllInSituation();
+      await this.handleAllInSituation();
       return;
     }
     
     // Переход к следующей улице или завершение раздачи
-    this.moveToNextStreet();
+    await this.moveToNextStreet();
   }
   
   // Переход к следующей улице
-  moveToNextStreet() {
+  async moveToNextStreet() {
     switch (this.currentStreet) {
       case 'preflop':
         console.log('⚠️ Предупреждение: симулятор не должен начинать с префлопа');
@@ -2109,7 +2360,7 @@ class PokerTable {
         this.dealRiver();
         break;
       case 'river':
-        this.completeHand();
+        await this.completeHand();
         break;
       default:
         console.log('Неизвестная улица:', this.currentStreet);
@@ -2205,7 +2456,7 @@ class PokerTable {
   }
   
   // Завершение раздачи
-  completeHand() {
+  async completeHand() {
     console.log('🏆 Раздача завершена');
     
     const activePlayers = Array.from(this.players.values()).filter(p => !p.isFolded);
@@ -2399,7 +2650,7 @@ class PokerTable {
       // ✅ ИСПРАВЛЕНИЕ: Добавляем обработку ошибок при генерации Hand History
       try {
         const handText = this.generateHandText();
-        this.saveHandToFile(handText);
+        await this.saveHandToFile(handText);
       } catch (error) {
         console.error('❌ Ошибка при генерации Hand History:', error);
         console.error('Stack trace:', error.stack);
@@ -2578,7 +2829,7 @@ class PokerTable {
   }
 
   // Обработать all-in ситуацию
-  handleAllInSituation() {
+  async handleAllInSituation() {
     console.log('🎯 Обработка all-in ситуации - автоматическая раздача карт...');
     
     // Сбросить флаги действий - больше торгов не будет
@@ -2593,7 +2844,7 @@ class PokerTable {
     this.dealRemainingCards();
     
     // Завершить раздачу
-    this.completeHand();
+    await this.completeHand();
   }
   
   // Раздать оставшиеся карты до ривера
@@ -3174,10 +3425,155 @@ class PokerTable {
     return extractedPreflop;
   }
 
-  saveHandToFile(handText) {
-    if (this.handHistoryFile && handText) {
-      fs.appendFileSync(this.handHistoryFile, handText);
+  // Улучшенный метод сохранения с обработкой ошибок
+  async saveHandToFile(handText) {
+    if (!handText || typeof handText !== 'string') {
+      console.error('❌ HandHistory текст пустой или некорректный');
+      return false;
     }
+
+    let fileWritten = false;
+    let dbSaved = false;
+
+    // 1. Попытка записи в файл
+    if (this.handHistoryFile) {
+      try {
+        // Проверяем существование папки перед записью
+        const dir = path.dirname(this.handHistoryFile);
+        if (!fs.existsSync(dir)) {
+          console.log(`📁 Создаем папку перед записью: ${dir}`);
+          fs.mkdirSync(dir, { recursive: true });
+        }
+
+        // Записываем в файл
+        fs.appendFileSync(this.handHistoryFile, handText + '\n');
+        console.log(`💾 HandHistory записана в файл: ${path.basename(this.handHistoryFile)}`);
+        fileWritten = true;
+
+        // Проверяем что файл действительно создался и содержит данные
+        if (fs.existsSync(this.handHistoryFile)) {
+          const stats = fs.statSync(this.handHistoryFile);
+          console.log(`📊 Размер файла: ${stats.size} байт, последнее изменение: ${stats.mtime}`);
+        }
+
+      } catch (fileError) {
+        console.error(`❌ Ошибка записи HandHistory в файл ${this.handHistoryFile}:`, fileError.message);
+        console.error(`❌ Код ошибки: ${fileError.code}, системное сообщение: ${fileError.syscall}`);
+        
+        // Если это проблема с правами доступа, пробуем альтернативный путь
+        if (fileError.code === 'EACCES' || fileError.code === 'EPERM') {
+          console.log(`🔄 Пробуем альтернативный путь для записи HandHistory...`);
+          try {
+            const tempDir = path.join(__dirname, 'temp_histories');
+            if (!fs.existsSync(tempDir)) {
+              fs.mkdirSync(tempDir, { recursive: true });
+            }
+            const tempFile = path.join(tempDir, `table_${this.tableId}_session_${this.sessionId}.txt`);
+            fs.appendFileSync(tempFile, handText + '\n');
+            console.log(`💾 HandHistory записана в альтернативный файл: ${tempFile}`);
+            this.handHistoryFile = tempFile; // Обновляем путь
+            fileWritten = true;
+          } catch (tempError) {
+            console.error(`❌ Альтернативная запись также не удалась:`, tempError.message);
+          }
+        }
+      }
+    } else {
+      console.warn('⚠️ HandHistory файл не инициализирован, пропускаем запись в файл');
+    }
+
+    // 2. Резервное сохранение в базу данных (если файловая запись не удалась)
+    if (!fileWritten) {
+      try {
+        console.log(`🗄️ Сохраняем HandHistory в базу данных как резервную копию...`);
+        
+        // Сохраняем в таблицу Hands с дополнительными метаданными
+        const handData = {
+          sessionId: this.sessionId,
+          tableId: this.tableId,
+          handNumber: this.handNumber,
+          handText: handText,
+          timestamp: new Date().toISOString(),
+          pot: this.pot,
+          street: this.currentStreet
+        };
+
+        // Если база данных доступна, сохраняем туда
+        if (database) {
+          await database.run(
+            'INSERT INTO Hands (user_id, hand_data, played_at) VALUES (?, ?, ?)',
+            ['system', JSON.stringify(handData), new Date().toISOString()]
+          );
+          console.log(`✅ HandHistory сохранена в базу данных`);
+          dbSaved = true;
+        }
+      } catch (dbError) {
+        console.error(`❌ Ошибка сохранения HandHistory в базу данных:`, dbError.message);
+      }
+    }
+
+    // 3. Если ничего не сработало, сохраняем в переменную класса
+    if (!fileWritten && !dbSaved) {
+      console.warn(`⚠️ Файловая и DB запись не удались, сохраняем HandHistory в памяти`);
+      if (!this.handHistoryBackup) {
+        this.handHistoryBackup = [];
+      }
+      this.handHistoryBackup.push({
+        handNumber: this.handNumber,
+        text: handText,
+        timestamp: new Date().toISOString()
+      });
+      console.log(`💭 HandHistory раздачи #${this.handNumber} сохранена в памяти (всего в памяти: ${this.handHistoryBackup.length})`);
+    }
+
+    return fileWritten || dbSaved;
+  }
+
+  // Новый метод для получения всех HandHistory данных (файл + DB + память)
+  async getAllHandHistory() {
+    const results = {
+      fileContent: '',
+      dbContent: [],
+      memoryContent: [],
+      totalHands: 0
+    };
+
+    // 1. Читаем из файла
+    if (this.handHistoryFile && fs.existsSync(this.handHistoryFile)) {
+      try {
+        results.fileContent = fs.readFileSync(this.handHistoryFile, 'utf8');
+        const handCount = (results.fileContent.match(/PokerStars Hand #/g) || []).length;
+        results.totalHands += handCount;
+        console.log(`📄 Из файла загружено ${handCount} раздач`);
+      } catch (error) {
+        console.error(`❌ Ошибка чтения файла HandHistory:`, error.message);
+      }
+    }
+
+    // 2. Читаем из базы данных
+    if (database) {
+      try {
+        const dbHands = await database.all(
+          'SELECT hand_data FROM Hands WHERE json_extract(hand_data, "$.sessionId") = ? AND json_extract(hand_data, "$.tableId") = ?',
+          [this.sessionId, this.tableId]
+        );
+        results.dbContent = dbHands.map(row => JSON.parse(row.hand_data));
+        results.totalHands += results.dbContent.length;
+        console.log(`🗄️ Из БД загружено ${results.dbContent.length} раздач`);
+      } catch (error) {
+        console.error(`❌ Ошибка чтения HandHistory из БД:`, error.message);
+      }
+    }
+
+    // 3. Читаем из памяти
+    if (this.handHistoryBackup && this.handHistoryBackup.length > 0) {
+      results.memoryContent = this.handHistoryBackup;
+      results.totalHands += results.memoryContent.length;
+      console.log(`💭 Из памяти загружено ${results.memoryContent.length} раздач`);
+    }
+
+    console.log(`📊 Всего HandHistory раздач для стола ${this.tableId}: ${results.totalHands}`);
+    return results;
   }
 }
 
@@ -3361,7 +3757,7 @@ io.on('connection', (socket) => {
   });
 
   // Обработка действий игрока
-  socket.on('player-action', (data) => {
+  socket.on('player-action', async (data) => {
     const userData = activeUsers.get(socket.id);
     if (!userData) return;
     
@@ -3381,7 +3777,7 @@ io.on('connection', (socket) => {
     }
     
     try {
-      const result = table.processPlayerAction(userData.userId, action, amount);
+      const result = await table.processPlayerAction(userData.userId, action, amount);
       
       if (result.success) {
         console.log(`📤 Отправка обновлений стола ${tableId} всем игрокам`);
