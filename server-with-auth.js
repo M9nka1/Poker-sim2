@@ -2465,118 +2465,54 @@ class PokerTable {
     let uncalledBet = 0;
     let uncalledBetPlayer = null;
     
-    // Правильный подсчет банка на основе всех действий
+    // ✅ ИСПРАВЛЕНИЕ: Простой и понятный расчет банка
     let totalPot = 0;
     
-    // ✅ ИСПРАВЛЕНИЕ: Сначала используем текущий this.pot как начальную точку
-    // (в нем уже учтены префлоп инвестиции из parseHandHistory)
-    if (this.pot > 0) {
-      totalPot = this.pot;
-      console.log(`💰 Начальный банк (включая префлоп): $${(this.pot / 100).toFixed(2)}`);
-    } else {
-      // Резервный вариант - пытаемся добавить префлоп инвестиции
-      if (this.preflopInvestments) {
-        const preflopTotal = Object.values(this.preflopInvestments).reduce((a, b) => a + b, 0);
-        totalPot += preflopTotal;
-        console.log(`💰 Префлоп инвестиции (резервный расчет): $${(preflopTotal / 100).toFixed(2)}`);
-      }
+    console.log(`🔍 DEBUG: Начальный this.pot = $${(this.pot / 100).toFixed(2)}`);
+    
+    // 1. Добавляем префлоп инвестиции
+    if (this.preflopInvestments) {
+      const preflopTotal = Object.values(this.preflopInvestments).reduce((a, b) => a + b, 0);
+      totalPot += preflopTotal;
+      console.log(`💰 Префлоп инвестиции: $${(preflopTotal / 100).toFixed(2)}`);
     }
     
-    // Подсчитываем все ставки по действиям из Hand History
+    // 2. Подсчитываем постфлоп ставки по действиям
+    let postflopTotal = 0;
     if (this.currentHandData && this.currentHandData.actions) {
-      // Подсчитываем инвестиции игроков по улицам
-      const streetTotals = { flop: {}, turn: {}, river: {} };
-      
       this.currentHandData.actions.forEach(action => {
-        if (action.action === 'bet' || action.action === 'raise' || action.action === 'call') {
-          const street = action.street || 'flop';
-          
-          if (!streetTotals[street]) {
-            streetTotals[street] = {};
-          }
-          if (!streetTotals[street][action.playerId]) {
-            streetTotals[street][action.playerId] = 0;
-          }
-          
-          if (action.action === 'bet') {
-            streetTotals[street][action.playerId] = action.amount; // Устанавливаем ставку
-          } else if (action.action === 'raise') {
-            // Для рейза устанавливаем полную сумму ставки игрока на улице
-            streetTotals[street][action.playerId] = action.totalBet || action.amount;
-          } else if (action.action === 'call') {
-            // Для колла добавляем к текущей ставке игрока на улице
-            streetTotals[street][action.playerId] += action.amount;
-          }
+        if (action.action === 'bet' || action.action === 'call') {
+          postflopTotal += action.amount;
+          console.log(`💰 ${action.action.toUpperCase()} на ${action.street}: $${(action.amount / 100).toFixed(2)}`);
         }
       });
+    }
+    
+    totalPot += postflopTotal;
+    console.log(`💰 Всего постфлоп ставок: $${(postflopTotal / 100).toFixed(2)}`);
+    
+    // 3. Вычисляем uncalled bet при фолде
+    if (!isShowdown && this.currentHandData && this.currentHandData.actions) {
+      // Находим последнюю ставку на текущей улице
+      const lastStreetActions = this.currentHandData.actions.filter(a => a.street === this.currentStreet);
+      const lastBetAction = lastStreetActions.filter(a => a.action === 'bet').pop();
       
-      // ✅ ИСПРАВЛЕНИЕ: Вычисляем uncalled bet при фолде
-      if (!isShowdown) {
-        // Находим максимальную ставку на последней улице и игрока, который её сделал
-        let lastStreet = this.currentStreet;
-        let maxBetOnStreet = 0;
-        let maxBetPlayerId = null;
+      if (lastBetAction) {
+        // Проверяем, был ли колл на эту ставку
+        const callAfterBet = lastStreetActions.find(a => 
+          a.action === 'call' && 
+          a.amount === lastBetAction.amount && 
+          a.playerId !== lastBetAction.playerId
+        );
         
-        Object.entries(streetTotals[lastStreet] || {}).forEach(([playerId, amount]) => {
-          if (amount > maxBetOnStreet) {
-            maxBetOnStreet = amount;
-            maxBetPlayerId = playerId;
-          }
-        });
-        
-        // Если есть неуравненная ставка (другие игроки поставили меньше или фолднули)
-        if (maxBetOnStreet > 0 && maxBetPlayerId) {
-          const otherPlayerAmounts = Object.entries(streetTotals[lastStreet] || {})
-            .filter(([playerId, amount]) => playerId !== maxBetPlayerId)
-            .map(([playerId, amount]) => amount);
-          
-          const maxOtherAmount = Math.max(0, ...otherPlayerAmounts);
-          uncalledBet = maxBetOnStreet - maxOtherAmount;
-          
-          if (uncalledBet > 0) {
-            uncalledBetPlayer = Array.from(this.players.values()).find(p => p.id === maxBetPlayerId);
-            
-            // ✅ ИСПРАВЛЕНИЕ: Если игрок не найден в this.players (например, был удален), 
-            // попробуем найти его в currentHandData.positions
-            if (!uncalledBetPlayer && this.currentHandData?.positions) {
-              for (const [seat, playerData] of Object.entries(this.currentHandData.positions)) {
-                if (playerData.id === maxBetPlayerId) {
-                  uncalledBetPlayer = {
-                    id: playerData.id,
-                    name: playerData.nickname || playerData.name || 'Player',
-                    position: playerData.position || 'Unknown'
-                  };
-                  break;
-                }
-              }
-            }
-            
-            console.log(`💰 Uncalled bet: $${(uncalledBet / 100).toFixed(2)} возвращено игроку ${uncalledBetPlayer?.name || 'Unknown'}`);
-            
-            // Уменьшаем банк на размер неуравненной ставки
-            streetTotals[lastStreet][maxBetPlayerId] -= uncalledBet;
-          }
+        if (!callAfterBet) {
+          // Ставка не была уравнена - это uncalled bet
+          uncalledBet = lastBetAction.amount;
+          uncalledBetPlayer = Array.from(this.players.values()).find(p => p.id === lastBetAction.playerId);
+          totalPot -= uncalledBet; // Убираем из банка
+          console.log(`💰 Uncalled bet: $${(uncalledBet / 100).toFixed(2)} возвращено игроку ${uncalledBetPlayer?.name || 'Unknown'}`);
         }
       }
-      
-      // Суммируем все ставки по улицам
-      let postflopTotal = 0;
-      Object.keys(streetTotals).forEach(street => {
-        const streetTotal = Object.values(streetTotals[street]).reduce((a, b) => a + b, 0);
-        if (streetTotal > 0) {
-          postflopTotal += streetTotal;
-          console.log(`💰 ${street.toUpperCase()}: $${(streetTotal / 100).toFixed(2)}`);
-        }
-      });
-      
-      // ✅ ИСПРАВЛЕНИЕ: Добавляем постфлоп ставки к банку (а не заменяем банк)
-      if (postflopTotal > 0) {
-        totalPot += postflopTotal;
-        console.log(`💰 Всего постфлоп ставок: $${(postflopTotal / 100).toFixed(2)}`);
-      } else {
-        console.log(`💰 Постфлоп ставок нет (только чеки)`);
-      }
-      
     }
     
     // Обновляем this.pot правильным значением

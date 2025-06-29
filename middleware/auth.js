@@ -108,26 +108,28 @@ const checkHandLimit = (req, res, next) => {
 const generateAccessToken = (user) => {
   const jwtSecret = process.env.JWT_SECRET;
   
-  // Отладочная информация
-  if (!jwtSecret) {
-    console.error('❌ JWT_SECRET не загружен! Содержимое process.env:', {
-      JWT_SECRET: process.env.JWT_SECRET,
-      NODE_ENV: process.env.NODE_ENV,
-      PATH_TO_CONFIG: './config.env'
-    });
+  // Подробное логирование для отладки
+  console.log('🔍 DEBUG generateAccessToken:');
+  console.log('  JWT_SECRET type:', typeof jwtSecret);
+  console.log('  JWT_SECRET length:', jwtSecret ? jwtSecret.length : 'undefined');
+  console.log('  JWT_SECRET value:', jwtSecret ? `${jwtSecret.substring(0, 10)}...` : 'EMPTY');
+  
+  // Проверяем все возможные проблемы
+  if (!jwtSecret || jwtSecret.trim() === '') {
+    console.error('❌ JWT_SECRET пустой или не установлен!');
     
     // Принудительная перезагрузка config.env
     try {
-      delete require.cache[require.resolve('path').resolve('./config.env')];
       require('dotenv').config({ path: './config.env' });
       console.log('🔄 Перезагрузка config.env выполнена');
-      console.log('🔑 JWT_SECRET после перезагрузки:', process.env.JWT_SECRET ? 'УСТАНОВЛЕН' : 'НЕ УСТАНОВЛЕН');
+      console.log('🔑 JWT_SECRET после перезагрузки:', process.env.JWT_SECRET ? `${process.env.JWT_SECRET.substring(0, 10)}...` : 'НЕ УСТАНОВЛЕН');
     } catch (err) {
       console.error('❌ Ошибка перезагрузки config:', err.message);
     }
-  } else {
-    console.log('✅ JWT_SECRET загружен успешно');
   }
+
+  const finalSecret = process.env.JWT_SECRET || 'poker-simulator-fallback-secret-2024';
+  console.log('🔑 Финальный secret для подписи:', finalSecret ? `${finalSecret.substring(0, 10)}...` : 'FALLBACK');
 
   return jwt.sign(
     { 
@@ -135,7 +137,7 @@ const generateAccessToken = (user) => {
       email: user.email,
       roles: user.roles || []
     },
-    process.env.JWT_SECRET || 'fallback-secret-key-for-development',
+    finalSecret,
     { 
       expiresIn: process.env.JWT_EXPIRES_IN || '15m',
       issuer: 'poker-simulator'
