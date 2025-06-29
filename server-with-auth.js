@@ -3179,7 +3179,9 @@ class PokerTable {
     // Summary
     const rakeAmount = this.calculateRake();
     handText += `*** SUMMARY ***\n`;
-    handText += `Total pot $${pot.toFixed(2)} | Rake $${(rakeAmount / 100).toFixed(2)}\n`;
+    // ✅ ИСПРАВЛЕНИЕ: Используем правильно рассчитанный банк из this.pot (в центах -> доллары)
+    const correctPot = this.pot / 100;
+    handText += `Total pot $${correctPot.toFixed(2)} | Rake $${(rakeAmount / 100).toFixed(2)}\n`;
     if (board.flop) {
       const allBoardCards = [...board.flop, ...(board.turn || []), ...(board.river || [])];
       handText += `Board [${allBoardCards.join(' ')}]\n`;
