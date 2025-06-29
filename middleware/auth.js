@@ -106,13 +106,36 @@ const checkHandLimit = (req, res, next) => {
 
 // Функция для генерации access токена
 const generateAccessToken = (user) => {
+  const jwtSecret = process.env.JWT_SECRET;
+  
+  // Отладочная информация
+  if (!jwtSecret) {
+    console.error('❌ JWT_SECRET не загружен! Содержимое process.env:', {
+      JWT_SECRET: process.env.JWT_SECRET,
+      NODE_ENV: process.env.NODE_ENV,
+      PATH_TO_CONFIG: './config.env'
+    });
+    
+    // Принудительная перезагрузка config.env
+    try {
+      delete require.cache[require.resolve('path').resolve('./config.env')];
+      require('dotenv').config({ path: './config.env' });
+      console.log('🔄 Перезагрузка config.env выполнена');
+      console.log('🔑 JWT_SECRET после перезагрузки:', process.env.JWT_SECRET ? 'УСТАНОВЛЕН' : 'НЕ УСТАНОВЛЕН');
+    } catch (err) {
+      console.error('❌ Ошибка перезагрузки config:', err.message);
+    }
+  } else {
+    console.log('✅ JWT_SECRET загружен успешно');
+  }
+
   return jwt.sign(
     { 
       userId: user.user_id,
       email: user.email,
       roles: user.roles || []
     },
-    process.env.JWT_SECRET,
+    process.env.JWT_SECRET || 'fallback-secret-key-for-development',
     { 
       expiresIn: process.env.JWT_EXPIRES_IN || '15m',
       issuer: 'poker-simulator'
