@@ -1,0 +1,19 @@
+BB vs CO Call  (RFI_IP_CO IP, CC_BB_OOP_vs_CO OOP)
+
+PokerStars Hand #1: Hold'em No Limit ($0.50/$1.00) - 2025/06/18 19:53:14 GMT+03:00
+Table 'PioSolver Table' 6-max Seat #5 is the button
+Seat 1: CC_BB_OOP_vs_CO ($100.00 in chips)
+Seat 2: Pio_EP ($100.00 in chips)
+Seat 3: Pio_MP ($100.00 in chips)
+Seat 4: RFI_IP_CO ($100.00 in chips)
+Seat 5: Pio_BTN ($100.00 in chips)
+Seat 6: Pio_SB ($100.00 in chips)
+Pio_SB: posts small blind $0.50
+CC_BB_OOP_vs_CO: posts big blind $1.00
+*** HOLE CARDS ***
+Pio_EP: folds
+Pio_MP: folds
+RFI_IP_CO: raises $1.75 to $2.50
+Pio_BTN: folds
+Pio_SB: folds
+CC_BB_OOP_vs_CO: calls $1.50

@@ -1,0 +1,12 @@
+# SB vs BTN open (Tournament)
+# Hero: SB with 20bb stack
+# Villain: BTN with 25bb stack
+# Action: BTN opens 2.2bb
+
+# 3-bet range:
+55+, A5s+, KTs+, QTs+, JTs
+A9o+, KQo
+
+# Call range:
+22-44, A2s-A4s, K2s-K9s, Q2s-Q9s, J2s-J9s, T2s-T9s
+A2o-A8o, K2o-KJo, Q2o-QJo, J7o-JTo 

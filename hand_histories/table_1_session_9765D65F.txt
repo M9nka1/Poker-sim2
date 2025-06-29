@@ -1,0 +1,46 @@
+
+Effective stack: $100
+Preflop investments: SB $0.5, BB $2.5, CO $2.5
+Player ranges:
+BB: 22+, A2s+, K2s+, Q2s+, J4s+, T6s+, 96s+, 85s+, 74s+, 64s+, 53s+, 43s, A2o+, K7o+, Q8o+, J8o+, T8o+, 98o
+CO: 22+, A2s+, K5s+, Q7s+, J8s+, T8s+, 98s, 87s, 76s, 65s, 54s, A8o+, KTo+, QTo+, JTo
+*** FLOP *** [6h Th Tc]
+TestPlayer1: checks
+TestPlayer2: checks
+*** TURN *** [6h Th Tc] [Ts]
+TestPlayer1: checks
+TestPlayer2: checks
+*** RIVER *** [6h Th Tc Ts] [Kh]
+TestPlayer1: checks
+TestPlayer2: checks
+*** SHOW DOWN ***
+TestPlayer1: shows [As Ac]
+TestPlayer2: shows [Js 4s]
+*** SUMMARY ***
+Total pot $0.00 | Rake $0.00
+Board [6h Th Tc Ts Kh]
+
+
+
+Effective stack: $100
+Preflop investments: SB $0.5, BB $2.5, CO $2.5
+Player ranges:
+BB: 22+, A2s+, K2s+, Q2s+, J4s+, T6s+, 96s+, 85s+, 74s+, 64s+, 53s+, 43s, A2o+, K7o+, Q8o+, J8o+, T8o+, 98o
+CO: 22+, A2s+, K5s+, Q7s+, J8s+, T8s+, 98s, 87s, 76s, 65s, 54s, A8o+, KTo+, QTo+, JTo
+*** FLOP *** [6c 4d 5s]
+TestPlayer1: checks
+TestPlayer2: checks
+*** TURN *** [6c 4d 5s] [Qc]
+TestPlayer1: checks
+TestPlayer2: checks
+*** RIVER *** [6c 4d 5s Qc] [3d]
+TestPlayer1: checks
+TestPlayer2: checks
+*** SHOW DOWN ***
+TestPlayer1: shows [3c 3s]
+TestPlayer2: shows [8c 8s]
+*** SUMMARY ***
+Total pot $0.00 | Rake $0.00
+Board [6c 4d 5s Qc 3d]
+
+

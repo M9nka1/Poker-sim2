@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест генерации HandHistory</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: #1a1a1a;
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .section {
+            background: #2a2a2a;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #444;
+        }
+        .title {
+            color: #4ade80;
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+        .description {
+            color: #9ca3af;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        .handhistory-output {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #00ff00;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .test-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background: #2563eb;
+        }
+        .btn:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+        }
+        .btn.success {
+            background: #059669;
+        }
+        .btn.success:hover {
+            background: #047857;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .status.success {
+            background: #065f46;
+            color: #34d399;
+            border: 1px solid #059669;
+        }
+        .status.error {
+            background: #7f1d1d;
+            color: #f87171;
+            border: 1px solid #dc2626;
+        }
+        .status.info {
+            background: #1e40af;
+            color: #93c5fd;
+            border: 1px solid #3b82f6;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .feature {
+            background: #374151;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #10b981;
+        }
+        .feature h4 {
+            margin: 0 0 8px 0;
+            color: #10b981;
+        }
+        .feature p {
+            margin: 0;
+            color: #d1d5db;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="section">
+            <div class="title">🎯 Тест генерации HandHistory PokerStars</div>
+            <div class="description">
+                Проверяем правильное формирование HandHistory в формате PokerStars, совместимом с покерными трекерами
+                (Holdem Manager 2, Hand2Note и др.)
+            </div>
+            
+            <div id="status" style="display: none;"></div>
+            
+            <div class="test-buttons">
+                <button class="btn" onclick="startTest()">🚀 Начать тест</button>
+                <button class="btn" onclick="exportHandHistory()" id="exportBtn" disabled>💾 Экспорт HandHistory</button>
+                <button class="btn" onclick="clearOutput()">🗑️ Очистить</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="title">📊 Результат генерации HandHistory</div>
+            <div class="description">
+                Ниже отображается сгенерированная история раздач в формате PokerStars:
+            </div>
+            <div id="handhistory-output" class="handhistory-output">
+                Нажмите "Начать тест" для генерации HandHistory...
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="title">✨ Особенности новой генерации</div>
+            <div class="features">
+                <div class="feature">
+                    <h4>🔄 Автоматическая нумерация</h4>
+                    <p>Каждая новая раздача получает уникальный номер на основе исходного номера, tableId и handNumber</p>
+                </div>
+                <div class="feature">
+                    <h4>🃏 Правильный формат карт</h4>
+                    <p>Карты форматируются согласно стандарту PokerStars: As, Kh, 7c, Td и т.д.</p>
+                </div>
+                <div class="feature">
+                    <h4>💰 Корректные рейзы</h4>
+                    <p>Рейзы записываются как "raises $X.XX to $Y.YY" с правильными суммами повышения</p>
+                </div>
+                <div class="feature">
+                    <h4>🎯 All-in поддержка</h4>
+                    <p>Автоматическое определение и отметка all-in действий</p>
+                </div>
+                <div class="feature">
+                    <h4>🏆 Show Down секция</h4>
+                    <p>Корректное формирование секции вскрытия карт с описанием рук</p>
+                </div>
+                <div class="feature">
+                    <h4>📋 Summary секция</h4>
+                    <p>Полная информация о банке, рейке, доске и результатах для каждого игрока</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Socket.IO клиент -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    
+    <script>
+        let socket = null;
+        let currentSessionId = null;
+        let currentTableId = null;
+        let currentHandHistory = null;
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${type}`;
+            statusEl.textContent = message;
+            statusEl.style.display = 'block';
+        }
+
+        function updateOutput(text) {
+            const outputEl = document.getElementById('handhistory-output');
+            outputEl.textContent = text;
+        }
+
+        function clearOutput() {
+            updateOutput('Нажмите "Начать тест" для генерации HandHistory...');
+            const exportBtn = document.getElementById('exportBtn');
+            exportBtn.disabled = true;
+        }
+
+        function startTest() {
+            showStatus('🔌 Подключение к серверу...', 'info');
+            
+            // Подключаемся к серверу
+            socket = io();
+            
+            socket.on('connect', () => {
+                showStatus('✅ Подключено к серверу, создаём сессию...', 'success');
+                createTestSession();
+            });
+
+            socket.on('session-created', (data) => {
+                showStatus(`🎮 Сессия создана: ${data.sessionId}`, 'success');
+                currentSessionId = data.sessionId;
+                
+                // Присоединяемся к сессии
+                socket.emit('join-session', {
+                    sessionId: data.sessionId,
+                    userId: 'test-user-1',
+                    playerName: 'TestPlayer1'
+                });
+            });
+
+            socket.on('session-joined', (data) => {
+                showStatus('🚀 Присоединились к сессии, запускаем игру...', 'success');
+                
+                // Запускаем игру
+                setTimeout(() => {
+                    socket.emit('start-game', { sessionId: currentSessionId });
+                }, 1000);
+            });
+
+            socket.on('game-started', (data) => {
+                showStatus('🎯 Игра началась, выбираем стол...', 'success');
+                currentTableId = 1; // Выбираем первый стол
+                
+                // Присоединяемся к столу
+                socket.emit('join-table', {
+                    sessionId: currentSessionId,
+                    tableId: currentTableId
+                });
+            });
+
+            socket.on('table-joined', (data) => {
+                showStatus('🃏 Присоединились к столу, начинаем играть...', 'success');
+                
+                // Начинаем автоматическую игру
+                setTimeout(() => {
+                    playAutomatically();
+                }, 2000);
+            });
+
+            socket.on('hand-completed', (data) => {
+                showStatus('🏆 Раздача завершена, получаем HandHistory...', 'success');
+                
+                if (data.handHistory && data.handHistory.formatted) {
+                    currentHandHistory = data.handHistory.formatted;
+                    updateOutput(currentHandHistory);
+                    
+                    const exportBtn = document.getElementById('exportBtn');
+                    exportBtn.disabled = false;
+                    
+                    showStatus('✅ HandHistory успешно сгенерирован!', 'success');
+                } else {
+                    showStatus('❌ Ошибка: HandHistory не получен', 'error');
+                }
+            });
+
+            socket.on('error', (error) => {
+                showStatus(`❌ Ошибка: ${error.message}`, 'error');
+            });
+        }
+
+        function createTestSession() {
+            const settings = {
+                preflopSpot: `PokerStars Hand #4400520541168030866: Hold'em No Limit ($5.00/$10.00) - 2024/12/14 2:21:47 GMT+03:00
+Table 'PioSolver Table' 6-max Seat #6 is the button
+Seat 1: Pio_OOP_3bet_SB ($1000.00 in chips)
+Seat 2: Pio_BB ($1000.00 in chips)
+Seat 3: Pio_EP ($1000.00 in chips)
+Seat 4: Pio_MP ($1000.00 in chips)
+Seat 5: Pio_CO ($1000.00 in chips)
+Seat 6: Pio_IP_c3bBU ($1000.00 in chips)
+Pio_OOP_3bet_SB: posts small blind $5.00
+Pio_BB: posts big blind $10.00
+*** HOLE CARDS ***
+Pio_EP: folds
+Pio_MP: folds
+Pio_CO: folds
+Pio_IP_c3bBU: raises $15.00 to $25.00
+Pio_OOP_3bet_SB: raises $85.00 to $110.00
+Pio_BB: folds
+Pio_IP_c3bBU: calls $85.00`,
+                boardSettings: {
+                    flop: {
+                        restricted: true,
+                        cards: ['As', 'Kh', '7c']
+                    }
+                },
+                playerRanges: {
+                    player1: 'AA,KK,QQ,AK',
+                    player2: 'AA,KK,QQ,AK'
+                }
+            };
+
+            socket.emit('create-session', {
+                userId: 'test-user-1',
+                playerName: 'TestPlayer1',
+                settings: settings
+            });
+        }
+
+        function playAutomatically() {
+            // Простая автоматическая игра для тестирования
+            let actionCount = 0;
+            
+            const actions = [
+                { action: 'check', amount: 0 },
+                { action: 'bet', amount: 5000 }, // $50
+                { action: 'call', amount: 5000 },
+                { action: 'check', amount: 0 },
+                { action: 'bet', amount: 12000 }, // $120
+                { action: 'call', amount: 12000 }
+            ];
+
+            function sendNextAction() {
+                if (actionCount < actions.length) {
+                    const action = actions[actionCount];
+                    
+                    socket.emit('player-action', {
+                        sessionId: currentSessionId,
+                        tableId: currentTableId,
+                        action: action.action,
+                        amount: action.amount
+                    });
+                    
+                    actionCount++;
+                    
+                    // Следующее действие через 2 секунды
+                    setTimeout(sendNextAction, 2000);
+                }
+            }
+
+            sendNextAction();
+        }
+
+        function exportHandHistory() {
+            if (!currentHandHistory) {
+                showStatus('❌ Нет HandHistory для экспорта', 'error');
+                return;
+            }
+
+            // Создаём blob и скачиваем файл
+            const blob = new Blob([currentHandHistory], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `hand_history_${currentTableId}_${Date.now()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            showStatus('💾 HandHistory экспортирован в файл', 'success');
+        }
+    </script>
+</body>
+</html> 

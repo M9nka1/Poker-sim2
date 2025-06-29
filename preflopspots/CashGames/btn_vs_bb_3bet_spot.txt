@@ -1,0 +1,15 @@
+# BTN vs BB 3-bet spot (Cash Game)
+# Hero: BTN with 100bb stack
+# Villain: BB with 100bb stack
+# Action: Hero opens 2.5bb, BB 3-bets to 8.5bb
+
+# Calling range:
+22+, A2s+, K9s+, Q9s+, J9s+, T8s+, 97s+, 86s+, 75s+, 64s+, 54s
+ATo+, KTo+, QTo+, JTo
+
+# 4-bet bluff range:
+A5s-A2s, K5s-K2s, Q6s-Q2s, J7s-J2s, T7s-T2s
+A9o-A2o
+
+# 4-bet value range:
+QQ+, AKs, AKo 

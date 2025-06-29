@@ -1,0 +1,40 @@
+PokerStars Hand #175017883941011: Hold'em No Limit ($1/$2) - 2025-06-17T16:47:30.785Z
+Table '1' 2-max Seat #2 is the button
+Seat 1: Pio_OOP_3bet_SB2 ($890.00 in chips)
+Seat 2: Pio_IP_c3bBU1 ($890.00 in chips)
+*** FLOP *** [9h Jc Kd]
+Pio_OOP_3bet_SB2: check
+Pio_IP_c3bBU1: check
+*** TURN *** [Kh]
+Pio_OOP_3bet_SB2: check
+Pio_IP_c3bBU1: check
+*** RIVER *** [9c]
+Pio_OOP_3bet_SB2: check
+Pio_IP_c3bBU1: check
+*** SUMMARY ***
+Total pot $230.00 | Rake $0.00
+Board [9h Jc Kd Kh 9c]
+Seat 0: Pio_OOP_3bet_SB2 won ($230.00)
+
+
+PokerStars Hand #175017885281512: Hold'em No Limit ($1/$2) - 2025-06-17T18:46:08.816Z
+Table '1' 2-max Seat #1 is the button
+Seat 1: Pio_OOP_3bet_SB2 ($890.00 in chips)
+Seat 2: Pio_IP_c3bBU1 ($890.00 in chips)
+*** FLOP *** [Ks 3c Jh]
+Pio_OOP_3bet_SB2: bets $20.00
+Pio_IP_c3bBU1: calls $20.00
+*** TURN *** [7s]
+Pio_OOP_3bet_SB2: check
+Pio_IP_c3bBU1: check
+*** RIVER *** [4s]
+Pio_OOP_3bet_SB2: bets $135.00
+Pio_IP_c3bBU1: raises $270.00
+Pio_OOP_3bet_SB2: raises $870.00
+Pio_IP_c3bBU1: calls $600.00
+*** SUMMARY ***
+Total pot $3790.00 | Rake $0.00
+Board [Ks 3c Jh 7s 4s]
+Seat 0: Pio_OOP_3bet_SB2 won ($3790.00)
+
+

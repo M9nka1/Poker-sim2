@@ -1,0 +1,19 @@
+PokerStars Hand #175017867988411: Hold'em No Limit ($1/$2) - 2025-06-17T16:44:57.561Z
+Table '1' 2-max Seat #2 is the button
+Seat 1: Pio_OOP_3bet_SB ($86.00 in chips)
+Seat 2: Pio_IP_c3bBU ($86.00 in chips)
+*** FLOP *** [4d Qd 9h]
+Pio_OOP_3bet_SB: check
+Pio_IP_c3bBU: check
+*** TURN *** [6s]
+Pio_OOP_3bet_SB: check
+Pio_IP_c3bBU: check
+*** RIVER *** [7d]
+Pio_OOP_3bet_SB: check
+Pio_IP_c3bBU: check
+*** SUMMARY ***
+Total pot $29.00 | Rake $0.00
+Board [4d Qd 9h 6s 7d]
+Seat 0: Pio_OOP_3bet_SB won ($29.00)
+
+

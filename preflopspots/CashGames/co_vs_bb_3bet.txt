@@ -1,0 +1,11 @@
+# CO vs BB 3-bet spot (Cash Game)
+# Hero: CO with 100bb stack
+# Villain: BB with 100bb stack
+# Action: Hero opens 2.5bb, BB 3-bets to 8bb
+
+# Calling range:
+22+, A9s+, KTs+, QTs+, JTs, T9s
+AJo+, KQo
+
+# 4-bet range:
+QQ+, AKs, AKo 

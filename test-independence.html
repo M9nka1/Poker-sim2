@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест независимости покерных столов</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: white;
+        }
+        .test-results {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: #2a2a2a;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .test-title {
+            color: #4ade80;
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+        .test-description {
+            color: #9ca3af;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        .test-steps {
+            background: #374151;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .step {
+            margin: 10px 0;
+            padding: 5px 0;
+        }
+        .step-number {
+            color: #fbbf24;
+            font-weight: bold;
+        }
+        .expected-behavior {
+            background: #065f46;
+            border: 1px solid #10b981;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .issue-fixed {
+            background: #7c2d12;
+            border: 1px solid #dc2626;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .code-example {
+            background: #111827;
+            border: 1px solid #374151;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .highlight {
+            background: #fbbf24;
+            color: #000;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        .nav-link {
+            display: inline-block;
+            background: #3b82f6;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 5px 0 0;
+        }
+        .nav-link:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-results">
+        <h1>🎯 Тест независимости покерных столов</h1>
+        
+        <div class="test-section">
+            <div class="test-title">📋 Описание проблемы</div>
+            <div class="test-description">
+                <strong>Проблема:</strong> Когда заканчивалась раздача на одном столе (например, столе #1), 
+                другие столы (столы #2, #3, #4) неправильно обновлялись или "закрывались", 
+                хотя они должны быть полностью независимыми.
+            </div>
+            
+            <div class="issue-fixed">
+                <h4>🔧 Что было исправлено:</h4>
+                <ul>
+                    <li><strong>updateTableUI</strong> - добавлена проверка участия игрока на столе</li>
+                    <li><strong>handleHandCompleted</strong> - игнорирует события для столов, где игрок не играет</li>
+                    <li><strong>handleActionProcessed</strong> - обрабатывает только действия на столах игрока</li>
+                    <li><strong>handleNewHandStarted</strong> - реагирует только на новые раздачи соответствующих столов</li>
+                    <li><strong>handleNewHandAutoStarted</strong> - аналогично для автоматических раздач</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <div class="test-title">🧪 Как протестировать исправления</div>
+            
+            <div class="test-steps">
+                <div class="step">
+                    <span class="step-number">1.</span> Откройте главную страницу игры: 
+                    <a href="http://localhost:3000" class="nav-link" target="_blank">Покер Симулятор</a>
+                </div>
+                
+                <div class="step">
+                    <span class="step-number">2.</span> Создайте мультиплеер сессию (нажмите кнопку мультиплеер в меню)
+                </div>
+                
+                <div class="step">
+                    <span class="step-number">3.</span> Скопируйте код сессии и откройте второй браузер/вкладку
+                </div>
+                
+                <div class="step">
+                    <span class="step-number">4.</span> Присоединитесь к сессии с помощью кода во второй вкладке
+                </div>
+                
+                <div class="step">
+                    <span class="step-number">5.</span> Запустите игру - должно появиться 4 стола
+                </div>
+                
+                <div class="step">
+                    <span class="step-number">6.</span> <span class="highlight">Основной тест:</span> 
+                    Играйте на столе #1, завершите раздачу до конца
+                </div>
+                
+                <div class="step">
+                    <span class="step-number">7.</span> <span class="highlight">Проверьте:</span> 
+                    Столы #2, #3, #4 должны остаться неизменными и доступными для игры
+                </div>
+                
+                <div class="step">
+                    <span class="step-number">8.</span> Попробуйте играть на столе #4, завершите раздачу
+                </div>
+                
+                <div class="step">
+                    <span class="step-number">9.</span> <span class="highlight">Убедитесь:</span> 
+                    Столы #1, #2, #3 не изменились при завершении раздачи на столе #4
+                </div>
+            </div>
+            
+            <div class="expected-behavior">
+                <h4>✅ Ожидаемое поведение после исправления:</h4>
+                <ul>
+                    <li>Каждый стол работает независимо от других</li>
+                    <li>Завершение раздачи на одном столе не влияет на другие столы</li>
+                    <li>Новые карты раздаются только на том столе, где завершилась раздача</li>
+                    <li>Интерфейс других столов остается неизменным</li>
+                    <li>В консоли браузера видны сообщения: "⚠️ Игрок не участвует на столе X, пропускаем..."</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <div class="test-title">🔍 Техническая реализация</div>
+            
+            <div class="test-description">
+                Исправления добавляют проверку участия игрока перед обработкой событий:
+            </div>
+            
+            <div class="code-example">
+// В каждом обработчике событий добавлена проверка:
+if (data.tableInfo) {
+  const heroPlayer = data.tableInfo.players.find(p => p.id === this.userId);
+  if (!heroPlayer) {
+    console.log(`⚠️ Игрок ${this.userId} не участвует на столе ${data.tableId}, пропускаем обработку`);
+    return;
+  }
+}
+            </div>
+            
+            <div class="test-description">
+                Серверная часть правильно отправляет события только участникам каждого конкретного стола:
+            </div>
+            
+            <div class="code-example">
+// Сервер: отправка события только игрокам стола
+session.players.forEach((player, playerId) => {
+  if (this.players.has(playerId)) {  // Проверка участия в столе
+    playerSocket.emit('hand-completed', {
+      tableId: this.tableId,
+      tableInfo: this.getTableInfo(playerId)
+    });
+  }
+});
+            </div>
+        </div>
+
+        <div class="test-section">
+            <div class="test-title">📊 Мониторинг в консоли</div>
+            
+            <div class="test-description">
+                Откройте консоль браузера (F12) для просмотра логов. Вы должны увидеть:
+            </div>
+            
+            <div class="test-steps">
+                <div class="step">
+                    <span class="step-number">✅</span> 
+                    <span style="color: #10b981;">🔄 Обновление интерфейса стола: 1</span> - для стола где игрок участвует
+                </div>
+                
+                <div class="step">
+                    <span class="step-number">⚠️</span> 
+                    <span style="color: #fbbf24;">⚠️ Игрок не участвует на столе 2, пропускаем обновление интерфейса</span> - для других столов
+                </div>
+                
+                <div class="step">
+                    <span class="step-number">📡</span> 
+                    <span style="color: #3b82f6;">📡 Уведомление о завершении раздачи на столе 1</span> - серверные события
+                </div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin: 40px 0;">
+            <a href="http://localhost:3000" class="nav-link">🎮 Начать тестирование</a>
+            <a href="http://localhost:3000" class="nav-link" onclick="window.open(this.href); return false;">🔄 Открыть вторую вкладку</a>
+        </div>
+    </div>
+    
+    <script>
+        // Автоматическая проверка доступности сервера
+        fetch('http://localhost:3000')
+            .then(response => {
+                if (response.ok) {
+                    console.log('✅ Сервер доступен на localhost:3000');
+                } else {
+                    console.warn('⚠️ Сервер отвечает с ошибкой:', response.status);
+                }
+            })
+            .catch(error => {
+                console.error('❌ Сервер недоступен:', error);
+                document.body.style.background = '#7f1d1d';
+                document.querySelector('h1').innerHTML = '❌ Сервер недоступен на localhost:3000';
+            });
+    </script>
+</body>
+</html> 

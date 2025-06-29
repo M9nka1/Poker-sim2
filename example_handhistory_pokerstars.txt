@@ -1,0 +1,41 @@
+PokerStars Hand #4400520541168030866: Hold'em No Limit ($5.00/$10.00) - 2024/12/14 2:21:47 GMT+03:00
+Table 'PioSolver Table' 6-max Seat #6 is the button
+Seat 1: Pio_OOP_3bet_SB ($1000.00 in chips)
+Seat 2: Pio_BB ($1000.00 in chips)
+Seat 3: Pio_EP ($1000.00 in chips)
+Seat 4: Pio_MP ($1000.00 in chips)
+Seat 5: Pio_CO ($1000.00 in chips)
+Seat 6: Pio_IP_c3bBU ($1000.00 in chips)
+Pio_OOP_3bet_SB: posts small blind $5.00
+Pio_BB: posts big blind $10.00
+*** HOLE CARDS ***
+Pio_EP: folds
+Pio_MP: folds
+Pio_CO: folds
+Pio_IP_c3bBU: raises $15.00 to $25.00
+Pio_OOP_3bet_SB: raises $85.00 to $110.00
+Pio_BB: folds
+Pio_IP_c3bBU: calls $85.00
+*** FLOP *** [As Kh 7c]
+Pio_OOP_3bet_SB: checks
+Pio_IP_c3bBU: checks
+*** TURN *** [As Kh 7c] [2d]
+Pio_OOP_3bet_SB: bets $50.00
+Pio_IP_c3bBU: calls $50.00
+*** RIVER *** [As Kh 7c] [2d] [9s]
+Pio_OOP_3bet_SB: checks
+Pio_IP_c3bBU: bets $120.00
+Pio_OOP_3bet_SB: calls $120.00
+*** SHOW DOWN ***
+Pio_IP_c3bBU: shows [Ac Ks] (two pair, Aces and Kings)
+Pio_OOP_3bet_SB: mucks hand
+Pio_IP_c3bBU collected $547.50 from pot
+*** SUMMARY ***
+Total pot $570 | Rake $22.50
+Board [As Kh 7c 2d 9s]
+Seat 1: Pio_OOP_3bet_SB (small blind) mucked
+Seat 2: Pio_BB (big blind) folded before Flop
+Seat 3: Pio_EP folded before Flop (didn't bet)
+Seat 4: Pio_MP folded before Flop (didn't bet)
+Seat 5: Pio_CO folded before Flop (didn't bet)
+Seat 6: Pio_IP_c3bBU (button) showed [Ac Ks] and won ($547.50) with two pair, Aces and Kings 

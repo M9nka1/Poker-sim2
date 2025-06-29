@@ -1,0 +1,31 @@
+PokerStars Hand #440052054116803086601: Hold'em No Limit ($5.00/$10.00) - 2025-06-17T19:07:43.782Z
+Table 'PioSolver Table' 6-max Seat #6 is the button
+Seat 1: Pio_OOP_3bet_SB ($1000.00 in chips)
+Seat 6: Pio_IP_c3bBU ($1000.00 in chips)
+Pio_OOP_3bet_SB: posts small blind $5.00
+Pio_BB: posts big blind $10.00
+*** HOLE CARDS ***
+Pio_EP: folds
+Pio_MP: folds
+Pio_CO: folds
+Pio_IP_c3bBU: raises $15.00 to $25.00
+Pio_OOP_3bet_SB: raises $85.00 to $110.00
+Pio_BB: folds
+Pio_IP_c3bBU: calls $85.00
+*** FLOP *** [8s 7d 3h]
+Pio_OOP_3bet_SB: checks
+Pio_IP_c3bBU: bets $75.00
+Pio_OOP_3bet_SB: raises $150.00 to $225.00
+Pio_IP_c3bBU: raises $275.00 to $500.00
+Pio_OOP_3bet_SB: calls $275.00
+*** TURN *** [8s 7d 3h] [4d]
+Pio_OOP_3bet_SB: checks
+Pio_IP_c3bBU: bets $390.00 and is all-in
+Pio_OOP_3bet_SB: calls $390.00 and is all-in
+*** RIVER *** [8s 7d 3h 4d] [Kc]
+*** SUMMARY ***
+Total pot $2010.00 | Rake $3.00
+Board [8s 7d 3h 4d Kc]
+Seat 1: Pio_OOP_3bet_SB won ($2007.00)
+
+

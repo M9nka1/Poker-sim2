@@ -1,0 +1,11 @@
+PokerStars Hand #4400520541168030867: Hold'em No Limit ($1.00/$2.00 USD) - 2024/06/05 09:46:00 ET
+Table 'UTG vs BTN 4bet Spot' 6-max Seat #6 is the button
+Seat 1: UTG_Player ($200.00 in chips)
+Seat 6: BTN_Player ($200.00 in chips)
+UTG_Player: posts small blind $1.00
+BTN_Player: posts big blind $2.00
+*** HOLE CARDS ***
+UTG_Player: raises $4.00 to $6.00
+BTN_Player: raises $14.00 to $20.00
+UTG_Player: raises $35.00 to $55.00
+BTN_Player: calls $35.00 

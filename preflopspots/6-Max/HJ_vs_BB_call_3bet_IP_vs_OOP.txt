@@ -1,0 +1,25 @@
+HJ vs BB Call 3bet IP vs OOP (Pio_IP_c3bBU IP, Pio_OOP_3bet_SB OOP)
+
+Seat 1: Pio_OOP_3bet_SB ($100.00 in chips) 
+Seat 2: Pio_BB ($100.00 in chips) 
+Seat 3: Pio_IP_c3bBU ($100.00 in chips) 
+Seat 4: Pio_EP ($100.00 in chips) 
+Seat 5: Pio_MP ($100.00 in chips) 
+Seat 6: Pio_CO ($100.00 in chips) 
+
+Pio_OOP_3bet_SB: posts small blind $0.50
+Pio_BB: posts big blind $1.00
+
+*** HOLE CARDS ***
+Dealt to Pio_OOP_3bet_SB [Kh Qs]
+Dealt to Pio_IP_c3bBU [As Kc]
+Pio_EP: folds 
+Pio_MP: folds 
+Pio_CO: folds 
+Pio_IP_c3bBU: raises $2.50 to $3.50
+Pio_OOP_3bet_SB: raises $10.50 to $14.00
+Pio_BB: folds
+Pio_IP_c3bBU: calls $10.50
+
+*** FLOP ***
+FLOP_PLACEHOLDER 

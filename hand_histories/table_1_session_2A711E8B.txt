@@ -1,0 +1,29 @@
+PokerStars Hand #175016600270211: Hold'em No Limit ($1/$2) - 2025-06-17T13:13:48.230Z
+Table '1' 2-max Seat #2 is the button
+Seat 1: Playera114a30a-6eab-45f1-94ed-a497b77ceb75 ($86.00 in chips)
+Seat 2: Player885f3513-1d4d-4813-9e44-2dd6a3e9e04b ($86.00 in chips)
+*** FLOP *** [J♣ J♥ 3♦]
+Playera114a30a-6eab-45f1-94ed-a497b77ceb75: bets $2.00
+Player885f3513-1d4d-4813-9e44-2dd6a3e9e04b: calls $2.00
+*** TURN *** [Q♦]
+Playera114a30a-6eab-45f1-94ed-a497b77ceb75: bets $2.00
+Player885f3513-1d4d-4813-9e44-2dd6a3e9e04b: fold
+*** SUMMARY ***
+Total pot $41.00 | Rake $0.00
+Board [J♣ J♥ 3♦ Q♦]
+Seat 0: Playerundefined won ($41.00)
+
+
+PokerStars Hand #175016603025012: Hold'em No Limit ($1/$2) - 2025-06-17T13:16:52.254Z
+Table '1' 2-max Seat #2 is the button
+Seat 1: Playera114a30a-6eab-45f1-94ed-a497b77ceb75 ($86.00 in chips)
+Seat 2: Player885f3513-1d4d-4813-9e44-2dd6a3e9e04b ($86.00 in chips)
+*** FLOP *** [T♣ Q♥ T♦]
+Playera114a30a-6eab-45f1-94ed-a497b77ceb75: bets $2.00
+Player885f3513-1d4d-4813-9e44-2dd6a3e9e04b: fold
+*** SUMMARY ***
+Total pot $33.00 | Rake $0.00
+Board [T♣ Q♥ T♦]
+Seat 0: Playerundefined won ($33.00)
+
+

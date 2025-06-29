@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Тест доступа к HandHistory</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #00ff88;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(0, 255, 136, 0.2);
+        }
+        
+        .test-section h2 {
+            color: #00ff88;
+            margin-top: 0;
+            font-size: 1.5em;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #00ff88, #00cc6a);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        button:hover {
+            background: linear-gradient(45deg, #00cc6a, #009952);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.3);
+        }
+        
+        .test-result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            line-height: 1.6;
+        }
+        
+        .test-result.success {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #00ff88;
+            color: #00ff88;
+        }
+        
+        .test-result.error {
+            background: rgba(255, 77, 77, 0.1);
+            border: 1px solid #ff4d4d;
+            color: #ff4d4d;
+        }
+        
+        .test-result.info {
+            background: rgba(0, 191, 255, 0.1);
+            border: 1px solid #00bfff;
+            color: #00bfff;
+        }
+        
+        .login-section {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid #ffc107;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .login-section h3 {
+            color: #ffc107;
+            margin-top: 0;
+        }
+        
+        .login-form {
+            display: flex;
+            gap: 10px;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group label {
+            color: #ffc107;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            padding: 8px 12px;
+            border: 1px solid #404040;
+            border-radius: 5px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            min-width: 200px;
+        }
+        
+        .login-btn {
+            background: linear-gradient(45deg, #ffc107, #ff9800);
+            height: fit-content;
+        }
+        
+        .login-btn:hover {
+            background: linear-gradient(45deg, #ff9800, #f57c00);
+        }
+        
+        pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border: 1px solid #404040;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Тест доступа к HandHistory</h1>
+        
+        <div class="login-section">
+            <h3>🔐 Быстрый вход в систему</h3>
+            <p>Если у вас истек токен, войдите в систему заново:</p>
+            <div class="login-form">
+                <div class="form-group">
+                    <label>Email:</label>
+                    <input type="email" id="loginEmail" placeholder="admin@pokersimu.com">
+                </div>
+                <div class="form-group">
+                    <label>Пароль:</label>
+                    <input type="password" id="loginPassword" placeholder="admin123">
+                </div>
+                <button class="login-btn" onclick="quickLogin()">Войти</button>
+                <button class="login-btn" onclick="fillDemoData()">Заполнить демо</button>
+            </div>
+            <div id="login-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>1. Проверка аутентификации</h2>
+            <button onclick="testAuth()">Проверить токен</button>
+            <div id="auth-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>2. Получение списка файлов</h2>
+            <button onclick="testFilesList()">Загрузить файлы</button>
+            <div id="files-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>3. Статистика файлов</h2>
+            <button onclick="testStats()">Загрузить статистику</button>
+            <div id="stats-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>4. Тест открытия HandHistory Manager</h2>
+            <button onclick="testOpenManager()">Открыть HandHistory Manager</button>
+            <div id="manager-result"></div>
+        </div>
+    </div>
+
+    <!-- Подключаем auth.js для доступа к функции openHandHistoryManager -->
+    <script src="/auth.js"></script>
+    
+    <script>
+        // Функция для получения токена
+        function getAuthToken() {
+            const keys = Object.keys(localStorage);
+            const tokenKey = keys.find(key => key.startsWith('auth_token_'));
+            
+            if (tokenKey) {
+                return localStorage.getItem(tokenKey);
+            }
+            
+            return localStorage.getItem('accessToken');
+        }
+
+        // Показать результат
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="test-result ${type}">${message}</div>`;
+        }
+
+        // Заполнение демо данных
+        function fillDemoData() {
+            document.getElementById('email').value = 'demo@test.com';
+            document.getElementById('password').value = 'demo123';
+            showResult('login-result', '✅ Демо данные заполнены! Нажмите "Войти"', 'success');
+        }
+
+        // Логин
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showResult('login-result', '❌ Введите email и пароль', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    // Сохраняем токен с sessionId
+                    const sessionId = Date.now().toString();
+                    localStorage.setItem(`auth_token_${sessionId}`, result.data.accessToken);
+                    localStorage.setItem('current_session_id', sessionId);
+                    
+                    showResult('login-result', `✅ Успешный вход! Токен сохранен.`, 'success');
+                } else {
+                    let errorMsg = result.message || 'Ошибка входа';
+                    if (errorMsg.includes('Слишком много попыток')) {
+                        errorMsg += ' (Сервер был перезапущен - попробуйте снова)';
+                    }
+                    showResult('login-result', `❌ ${errorMsg}`, 'error');
+                }
+            } catch (error) {
+                console.error('Ошибка входа:', error);
+                showResult('login-result', `❌ Ошибка запроса: ${error.message}`, 'error');
+            }
+        }
+
+        // Тест аутентификации
+        async function testAuth() {
+            const token = getAuthToken();
+            
+            if (!token) {
+                showResult('auth-result', '❌ Токен не найден в localStorage. Войдите в систему выше.', 'error');
+                return;
+            }
+            
+            showResult('auth-result', `✅ Токен найден: ${token.substring(0, 20)}...`, 'success');
+            
+            try {
+                const response = await fetch('/api/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    const user = result.data ? result.data.user : result;
+                    showResult('auth-result', 
+                        `✅ Аутентификация успешна<br>
+                        👤 Email: ${user.email}<br>
+                        🎯 Роли: ${user.roles.join(', ')}<br>
+                        🃏 Лимит раздач: ${user.hand_limit}`, 'success');
+                } else {
+                    const error = await response.json();
+                    showResult('auth-result', `❌ Ошибка аутентификации: ${error.message || 'Токен истек'}`, 'error');
+                }
+            } catch (error) {
+                showResult('auth-result', `❌ Ошибка запроса: ${error.message}`, 'error');
+            }
+        }
+
+        // Тест списка файлов
+        async function testFilesList() {
+            const token = getAuthToken();
+            
+            if (!token) {
+                showResult('files-result', '❌ Сначала проверьте аутентификацию', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/handhistory', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const filesCount = data.files.length;
+                    const isAdmin = data.isAdmin;
+                    
+                    let resultHtml = `✅ Список файлов загружен<br>
+                        📁 Найдено файлов: ${filesCount}<br>
+                        👤 Права: ${isAdmin ? 'Администратор' : 'Пользователь'}<br>`;
+                    
+                    if (filesCount > 0) {
+                        resultHtml += `<br><strong>Последние файлы:</strong><br>`;
+                        data.files.slice(0, 3).forEach(file => {
+                            resultHtml += `• ${file.filename} (${file.handsCount} раздач)<br>`;
+                        });
+                    }
+                    
+                    showResult('files-result', resultHtml, 'success');
+                } else {
+                    const error = await response.json();
+                    showResult('files-result', `❌ Ошибка загрузки: ${error.message || error.error || 'Токен истек'}`, 'error');
+                }
+            } catch (error) {
+                showResult('files-result', `❌ Ошибка запроса: ${error.message}`, 'error');
+            }
+        }
+
+        // Тест статистики
+        async function testStats() {
+            const token = getAuthToken();
+            
+            if (!token) {
+                showResult('stats-result', '❌ Сначала проверьте аутентификацию', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/handhistory/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const stats = await response.json();
+                    
+                    const resultHtml = `✅ Статистика загружена<br>
+                        📁 Всего файлов: ${stats.totalFiles}<br>
+                        🃏 Всего раздач: ${stats.totalHands}<br>
+                        💾 Общий размер: ${formatFileSize(stats.totalSize)}<br>
+                        🎮 Уникальных сессий: ${stats.uniqueSessions}`;
+                    
+                    showResult('stats-result', resultHtml, 'success');
+                } else {
+                    const error = await response.json();
+                    showResult('stats-result', `❌ Ошибка загрузки: ${error.message || error.error || 'Токен истек'}`, 'error');
+                }
+            } catch (error) {
+                showResult('stats-result', `❌ Ошибка запроса: ${error.message}`, 'error');
+            }
+        }
+
+        // Тест открытия HandHistory Manager
+        function testOpenManager() {
+            try {
+                // Проверяем наличие функции в window или глобальном контексте
+                if (typeof window.openHandHistoryManager === 'function') {
+                    showResult('manager-result', '✅ Функция openHandHistoryManager() найдена в window', 'success');
+                    
+                    // Проверяем аутентификацию перед открытием
+                    const token = getAuthToken();
+                    if (!token) {
+                        showResult('manager-result', '❌ Необходимо войти в систему для доступа к HandHistory Manager', 'error');
+                        return;
+                    }
+                    
+                    // Пробуем открыть в новой вкладке
+                    window.open('/handhistory-manager-auth.html', '_blank');
+                    showResult('manager-result', '✅ HandHistory Manager открыт в новой вкладке', 'success');
+                } else if (typeof openHandHistoryManager === 'function') {
+                    showResult('manager-result', '✅ Функция openHandHistoryManager() найдена', 'success');
+                    
+                    // Проверяем аутентификацию перед открытием
+                    const token = getAuthToken();
+                    if (!token) {
+                        showResult('manager-result', '❌ Необходимо войти в систему для доступа к HandHistory Manager', 'error');
+                        return;
+                    }
+                    
+                    // Пробуем открыть в новой вкладке
+                    window.open('/handhistory-manager-auth.html', '_blank');
+                    showResult('manager-result', '✅ HandHistory Manager открыт в новой вкладке', 'success');
+                } else {
+                    showResult('manager-result', '❌ Функция openHandHistoryManager() не найдена. Попробуйте открыть напрямую.', 'error');
+                    
+                    // Альтернативный способ - прямое открытие
+                    setTimeout(() => {
+                        window.open('/handhistory-manager-auth.html', '_blank');
+                        showResult('manager-result', '✅ HandHistory Manager открыт напрямую', 'success');
+                    }, 1000);
+                }
+            } catch (error) {
+                showResult('manager-result', `❌ Ошибка: ${error.message}`, 'error');
+            }
+        }
+
+        // Вспомогательная функция для форматирования размера файла
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Автоматический тест при загрузке страницы
+        window.onload = function() {
+            // Заполняем демо данные
+            fillDemoData();
+            
+            // Запускаем тест аутентификации через секунду
+            setTimeout(() => {
+                testAuth();
+            }, 1000);
+        };
+    </script>
+</body>
+</html> 

@@ -1,0 +1,10 @@
+PokerStars Hand #4400520541168030866: Hold'em No Limit ($0.50/$1.00 USD) - 2024/06/05 09:45:00 ET
+Table 'BTN vs BB 3bet Spot' 2-max Seat #1 is the button
+Seat 1: Hero ($100.00 in chips)
+Seat 2: Villain ($100.00 in chips)
+Hero: posts small blind $0.50
+Villain: posts big blind $1.00
+*** HOLE CARDS ***
+Hero: raises $1.50 to $2.50
+Villain: raises $6.50 to $9.00
+Hero: calls $6.50 

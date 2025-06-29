@@ -1,0 +1,7 @@
+ NODE_ENV=production
+JWT_SECRET=ваш-уникальный-секретный-ключ-минимум-32-символа
+JWT_REFRESH_SECRET=ваш-уникальный-refresh-секретный-ключ-минимум-32-символа
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+BCRYPT_ROUNDS=12
+DB_PATH=./database/poker_simulator.db

@@ -1,0 +1,8 @@
+AA, KK, QQ, JJ
+AKs, AQs, AJs, ATs, A5s, A4s
+AKo, AQo
+KQs, KJs
+87s, 76s, 65s
+A7s:0.5, A6s:0.5, A3s:0.5, A2s:0.5
+AJo:0.75, ATo:0.5
+KQo:0.25, KJo:0.25
